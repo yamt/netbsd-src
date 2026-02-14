@@ -32,7 +32,7 @@
 .\"
 .\"     @(#)boot_i386.8	8.2 (Berkeley) 4/19/94
 .\"
-.Dd July 15, 2020
+.Dd February 14, 2026
 .Dt BOOT 8 x86
 .Os
 .Sh NAME
@@ -392,6 +392,9 @@ Setting the
 with the
 .Li pc
 device is not possible.
+.It Ic consdev com, Ns ioport Ns Oo Ns Ic \&, Ns Ar speed Oc
+[Only available for UEFI boot] Use the com device with the specified
+I/O port number.
 .It Ic dev Op Ar device
 Set the default drive and partition for subsequent file system
 operations.
