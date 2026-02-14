@@ -1615,6 +1615,7 @@
 ./usr/share/man/cat4/pceb.0			man-sys-catman		.cat
 ./usr/share/man/cat4/pcf8563rtc.0		man-sys-catman		.cat
 ./usr/share/man/cat4/pchb.0			man-sys-catman		.cat
+./usr/share/man/cat4/pchtemp.0			man-sys-catman		.cat
 ./usr/share/man/cat4/pci.0			man-sys-catman		.cat
 ./usr/share/man/cat4/pcib.0			man-sys-catman		.cat
 ./usr/share/man/cat4/pciback.0			man-sys-catman		.cat
@@ -4981,6 +4982,7 @@
 ./usr/share/man/html4/pceb.html			man-sys-htmlman		html
 ./usr/share/man/html4/pcf8563rtc.html		man-sys-htmlman		html
 ./usr/share/man/html4/pchb.html			man-sys-htmlman		html
+./usr/share/man/html4/pchtemp.html		man-sys-htmlman		html
 ./usr/share/man/html4/pci.html			man-sys-htmlman		html
 ./usr/share/man/html4/pcib.html			man-sys-htmlman		html
 ./usr/share/man/html4/pciback.html		man-sys-htmlman		html
@@ -8219,6 +8221,7 @@
 ./usr/share/man/man4/pceb.4			man-sys-man		.man
 ./usr/share/man/man4/pcf8563rtc.4		man-sys-man		.man
 ./usr/share/man/man4/pchb.4			man-sys-man		.man
+./usr/share/man/man4/pchtemp.4			man-sys-man		.man
 ./usr/share/man/man4/pci.4			man-sys-man		.man
 ./usr/share/man/man4/pcib.4			man-sys-man		.man
 ./usr/share/man/man4/pciback.4			man-sys-man		.man
