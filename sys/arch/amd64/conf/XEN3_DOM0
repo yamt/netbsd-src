@@ -534,6 +534,8 @@ amdtemp* at amdnb_misc?  		# AMD CPU Temperature sensors
 amdsmn* at pci?				# AMD SMN Configuration
 amdzentemp* at amdsmnbus?		# AMD Ryzen Family 17h CPU temp sensors
 
+pchtemp* at pci?			# Intel PCH Thermal Subsystem
+
 # Winbond LPC Super I/O
 #wbsio*	at isa? port 0x2e
 #wbsio*	at isa? port 0x4e

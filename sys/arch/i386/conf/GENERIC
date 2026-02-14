@@ -423,6 +423,8 @@ elansc* at mainbus? bus ?		# AMD Elan SC520 System Controller
 amdnb_misc* at pci?			# AMD NB Misc Configuration
 amdtemp* at amdnb_misc?			# AMD CPU Temperature sensors
 
+pchtemp* at pci?			# Intel PCH Thermal Subsystem
+
 # PCI bridges
 #amdpcib* at pci? dev ? function ?	# AMD 8111 PCI-ISA w/ HPET
 #hpet*	at amdpcib?
