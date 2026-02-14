@@ -204,6 +204,8 @@
 ./@MODULEDIR@/nxt2k/nxt2k.kmod			modules-base-kernel	kmod
 ./@MODULEDIR@/odcm				modules-base-kernel	kmod
 ./@MODULEDIR@/odcm/odcm.kmod			modules-base-kernel	kmod
+./@MODULEDIR@/pchtemp				modules-base-kernel	kmod
+./@MODULEDIR@/pchtemp/pchtemp.kmod		modules-base-kernel	kmod
 ./@MODULEDIR@/powernow				modules-base-kernel	kmod
 ./@MODULEDIR@/powernow/powernow.kmod		modules-base-kernel	kmod
 ./@MODULEDIR@/pwdog				modules-base-kernel	kmod
