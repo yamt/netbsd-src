@@ -88,3 +88,8 @@ file	arch/x86/pci/imcsmb/imc.c		imc
 device	imcsmb: i2cbus
 attach	imcsmb at imc
 file	arch/x86/pci/imcsmb/imcsmb.c		imcsmb
+
+# Intel PCH Thermal Subsystem
+device	pchtemp: sysmon_envsys
+attach	pchtemp at pci
+file	arch/x86/pci/pchtemp.c		pchtemp
