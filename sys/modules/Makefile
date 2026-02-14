@@ -239,6 +239,7 @@ SUBDIR+=	hdaudioverbose
 SUBDIR+=	hpet
 SUBDIR+=	ichsmb
 SUBDIR+=	odcm
+SUBDIR+=	pchtemp
 SUBDIR+=	powernow
 SUBDIR+=	tco
 SUBDIR+=	tprof_x86
