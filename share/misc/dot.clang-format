@@ -20,10 +20,8 @@ IndentWidth: 8
 BracedInitializerIndentWidth: 8
 # prefer using tabs to spaces when indenting
 UseTab: ForContinuationAndIndentation
-# indent 1 space more per #if-level
-PPIndentWidth: 1
-# and put the space after the hash but before the keyword (i.e., "# if")
-IndentPPDirectives: AfterHash
+# no indent for #if-level
+PPIndentWidth: 0
 # backslashes at end-of-line are aligned, but as far left as possible
 AlignEscapedNewlines: Left
 # not supported in clang-format 18, would include the last line (without backslash) in the offset consideration
