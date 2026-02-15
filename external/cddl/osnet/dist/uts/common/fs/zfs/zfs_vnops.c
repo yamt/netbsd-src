@@ -6264,6 +6264,7 @@ zfs_netbsd_putpages(void *v)
 		if (pagedaemon) {
 			rl = zfs_range_lock_try(zp, offlo, len, RL_WRITER);
 			if (rl == NULL) {
+				printf("ZFS: PR/60004 deadlock\n");
 				error = EBUSY;
 				goto fail;
 			}
