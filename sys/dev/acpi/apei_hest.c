@@ -919,8 +919,10 @@ apei_hest_attach(struct apei_softc *sc)
 		aprint_error_dev(sc->sc_dev, "HEST: too many error sources\n");
 		return;
 	}
-	hsc->hsc_source = kmem_zalloc(n * sizeof(hsc->hsc_source[0]),
-	    KM_SLEEP);
+	if (n > 0) {
+		hsc->hsc_source = kmem_zalloc(n * sizeof(hsc->hsc_source[0]),
+			KM_SLEEP);
+	}
 
 	header = (ACPI_HEST_HEADER *)(hest + 1);
 	resid = hest->Header.Length - sizeof(*hest);
