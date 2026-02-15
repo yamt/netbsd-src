@@ -2837,6 +2837,7 @@ zfs_init(void)
 {
 
 	printf("ZFS filesystem version: " ZPL_VERSION_STRING "\n");
+	printf("ZFS yamt local-patched\n");
 
 	/*
 	 * Initialize .zfs directory structures
