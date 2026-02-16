@@ -1911,7 +1911,7 @@ vcache_reclaim(vnode_t *vp)
 	}
 
 	if (vip->vi_key.vk_key_len > 0) {
-	/* Remove from vnode cache. */
+		/* Remove from vnode cache. */
 		hash = vcache_hash(&vip->vi_key);
 		mutex_enter(&vcache_lock);
 		KASSERT(vip == vcache_hash_lookup(&vip->vi_key, hash));
