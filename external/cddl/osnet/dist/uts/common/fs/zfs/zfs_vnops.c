@@ -1449,7 +1449,7 @@ zfs_get_done(zgd_t *zgd, int error)
 	 * Release the vnode asynchronously as we currently have the
 	 * txg stopped from syncing.
 	 */
-	VN_RELE_CLEANER(ZTOV(zp), dsl_pool_vnrele_taskq(dmu_objset_pool(os)));
+	VN_RELE_ASYNC(ZTOV(zp), dsl_pool_vnrele_taskq(dmu_objset_pool(os)));
 
 	if (error == 0 && zgd->zgd_bp)
 		zil_add_block(zgd->zgd_zilog, zgd->zgd_bp);
@@ -1484,14 +1484,14 @@ zfs_get_data(void *arg, lr_write_t *lr, char *buf, zio_t *zio)
 	/*
 	 * Nothing to do if the file has been removed
 	 */
-	if (zfs_zget_cleaner(zfsvfs, object, &zp) != 0)
+	if (zfs_zget(zfsvfs, object, &zp) != 0)
 		return (SET_ERROR(ENOENT));
 	if (zp->z_unlinked) {
 		/*
 		 * Release the vnode asynchronously as we currently have the
 		 * txg stopped from syncing.
 		 */
-		VN_RELE_CLEANER(ZTOV(zp),
+		VN_RELE_ASYNC(ZTOV(zp),
 		    dsl_pool_vnrele_taskq(dmu_objset_pool(os)));
 		return (SET_ERROR(ENOENT));
 	}
@@ -5880,14 +5880,6 @@ zfs_netbsd_reclaim(void *v)
 			dmu_tx_commit(tx);
 		}
 	}
-
-	/*
-	 * Operation zfs_znode.c::zfs_zget_cleaner() depends on this
-	 * zil_commit() as a barrier to guarantee the znode cannot
-	 * get freed before its log entries are resolved.
-	 */
-	if (zfsvfs->z_log)
-		zil_commit(zfsvfs->z_log, zp->z_id);
 
 	if (zp->z_sa_hdl == NULL)
 		zfs_znode_free(zp);
