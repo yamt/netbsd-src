@@ -172,7 +172,6 @@ do {								      \
 #define	VN_URELE(v)	vput(v)
 #undef VN_RELE_ASYNC
 #define VN_RELE_ASYNC(vp, taskq) 	vrele_async((vp))
-#define VN_RELE_CLEANER(vp, taskq)	/* nothing */
 
 #define	vnevent_create(vp, ct)			do { } while (0)
 #define	vnevent_link(vp, ct)			do { } while (0)
