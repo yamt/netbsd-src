@@ -433,6 +433,19 @@ pmap_tlb_shootnow(void)
 			splx(s);
 			return;
 		}
+		/*
+		 * ...otherwise, interrupts should not have modified
+		 * our states.
+		 *
+		 * Note: If the following KASSERTs fail, it probably
+		 * means a missing pmap_update() in the interrupt handler.
+		 * We don't allow such a usage. (Otherwise, we need to
+		 * recalculate rcpucount here.)
+		 */
+		KASSERT(local == kcpuset_isset(target, cid) ? 1 : 0);
+		KASSERT(rcpucount == kcpuset_countset(target) - local);
+		KASSERT(memcmp(__UNVOLATILE(ts), __UNVOLATILE(tp),
+		    sizeof(*ts)) == 0);
 	}
 
 	/*
