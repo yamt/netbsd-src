@@ -243,7 +243,12 @@ tsc_tc_init(void)
 		invariant = false;
 	} else if (vm_guest == VM_GUEST_NO) {
 		delay_func = tsc_delay;
-	} else if (vm_guest == VM_GUEST_VIRTUALBOX) {
+	} else if (vm_guest == VM_GUEST_VIRTUALBOX ||
+		   vm_guest == VM_GUEST_NVMM) {
+		/*
+		 * nvmm doesn't advance guest tsc constantly unless
+		 * the vcpu is pinned to a physical cpu.
+		 */
 		tsc_timecounter.tc_quality = -100;
 	}
 
