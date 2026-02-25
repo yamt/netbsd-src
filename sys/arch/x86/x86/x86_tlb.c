@@ -125,6 +125,7 @@ static struct evcnt		tlbstat_remote[TLBSHOOT__MAX];
 static struct evcnt		tlbstat_kernel[TLBSHOOT__MAX];
 static struct evcnt		tlbstat_single_req;
 static struct evcnt		tlbstat_single_issue;
+static struct evcnt		tlbstat_intr;
 static const char *		tlbstat_name[ ] = {
 	"REMOVE_ALL",
 	"KENTER",
@@ -166,6 +167,8 @@ pmap_tlb_init(void)
 	    NULL, "tlbshoot single page", "requests");
 	evcnt_attach_dynamic(&tlbstat_single_issue, EVCNT_TYPE_MISC,
 	    NULL, "tlbshoot single page", "issues");
+	evcnt_attach_dynamic(&tlbstat_intr, EVCNT_TYPE_MISC,
+	    NULL, "tlbshoot", "intr");
 #endif
 }
 
@@ -431,6 +434,9 @@ pmap_tlb_shootnow(void)
 		 */
 		if (TP_GET_COUNT(tp) == 0) {
 			splx(s);
+#ifdef TLBSTATS
+			atomic_add_64(&tlbstat_intr.ev_count, 1);
+#endif
 			return;
 		}
 		/*
