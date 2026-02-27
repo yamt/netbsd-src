@@ -508,7 +508,7 @@ sched_lwp_collect(struct lwp *t)
 	/* Absorb estcpu value of collected LWP. */
 	l = curlwp;
 	lwp_lock(l);
-	l->l_estcpu += t->l_estcpu;
+	l->l_estcpu = ESTCPULIM(l->l_estcpu + t->l_estcpu);
 	lwp_unlock(l);
 }
 
