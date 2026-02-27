@@ -3341,7 +3341,7 @@ out:
 	}
 
 	/*
-	 * VOP_PUTPAGE causes FAF write where kernel does not 
+	 * VOP_PUTPAGES causes FAF write where kernel does not
 	 * check operation result. At least warn if it failed.
 	 */
 #ifdef PUFFS_WRITE_FAF
