@@ -542,7 +542,7 @@ vfs_insmntque(vnode_t *vp, struct mount *mp)
 	struct mount *omp;
 	kmutex_t *lock;
 
-	KASSERT(mp == NULL || (mp->mnt_iflag & IMNT_UNMOUNT) == 0 ||
+	KASSERT(mp == NULL || (mp->mnt_iflag & IMNT_GONE) == 0 ||
 	    vp->v_tag == VT_VFS);
 
 	/*
