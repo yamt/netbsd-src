@@ -2436,8 +2436,11 @@ zfs_umount(vfs_t *vfsp, int fflag)
 	 * we loop here because zil_commit can bring some vnodes
 	 * back to mnt_vnodelist via zfs_get_data.
 	 */
+	int attempt = 0;
 	mutex_enter(vfsp->mnt_vnodelock);
 	while (!TAILQ_EMPTY(&vfsp->mnt_vnodelist)) {
+		attempt++;
+		printf("%s: %p: vflush attempt %u\n", __func__, vfsp, attempt);
 		mutex_exit(vfsp->mnt_vnodelock);
 		ret = vflush(vfsp, NULL, (fflag & MS_FORCE) ? FORCECLOSE : 0);
 		if (ret != 0)
