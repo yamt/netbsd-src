@@ -542,7 +542,7 @@ vfs_insmntque(vnode_t *vp, struct mount *mp)
 	struct mount *omp;
 	kmutex_t *lock;
 
-	KASSERT(mp == NULL || (mp->mnt_iflag & IMNT_UNMOUNT) == 0 ||
+	KASSERT(mp == NULL || (mp->mnt_iflag & IMNT_GONE) == 0 ||
 	    vp->v_tag == VT_VFS);
 
 	/*
@@ -1003,6 +1003,7 @@ dounmount(struct mount *mp, int flags, struct lwp *l)
 	 * vfs_busy() from succeeding.
 	 */
 	mp->mnt_iflag |= IMNT_GONE;
+	KASSERT(TAILQ_EMPTY(&mp->mnt_vnodelist));
 	if ((coveredvp = mp->mnt_vnodecovered) != NULLVP) {
 		coveredvp->v_mountedhere = NULL;
 	}
