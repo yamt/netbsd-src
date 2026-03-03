@@ -521,9 +521,15 @@ out:
 }
 
 /*
- * Try to find a pathname for a vnode.  Since there is no mapping vnode ->
- * parent directory, this needs the namecache to succeed.  Caller holds a
- * reference to the vnode.
+ * Try to find a pathname for a vnode.
+ *
+ * Note: This is inherently unreliable.
+ * Since there is no mapping vnode -> parent directory, this needs
+ * the namecache to succeed. This function returns ENOENT when the
+ * vnode was not found in the namecache. It's the caller's
+ * responsibility to deal with the case.
+ *
+ * Caller holds a reference to the vnode.
  */
 int
 vnode_to_path(char *path, size_t len, struct vnode *vp, struct lwp *curl,
