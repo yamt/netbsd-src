@@ -49,6 +49,10 @@ struct timeval {
 #include <sys/timespec.h>
 
 #if defined(_NETBSD_SOURCE)
+/*
+ * TIMEVAL_TO_TIMESPEC: exact conversion
+ * TIMESPEC_TO_TIMEVAL: round down sub us
+ */
 #define	TIMEVAL_TO_TIMESPEC(tv, ts) do {				\
 	(ts)->tv_sec = (tv)->tv_sec;					\
 	(ts)->tv_nsec = (tv)->tv_usec * 1000;				\
