@@ -2294,6 +2294,9 @@ zfsvfs_teardown(zfsvfs_t *zfsvfs, boolean_t unmounting)
 #ifdef FREEBSD_NAMECACHE
 		cache_purgevfs(zfsvfs->z_parent->z_vfs, true);
 #endif
+#ifdef __NetBSD__
+		cache_purgevfs(zfsvfs->z_parent->z_vfs);
+#endif
 	}
 
 	/*
