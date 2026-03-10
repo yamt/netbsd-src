@@ -6364,8 +6364,6 @@ zfs_netbsd_putpages(void *v)
 	}
 	error = genfs_putpages(v);
 	if (cleaning) {
-		bool commit = (flags & (PGO_SYNCIO|PGO_RECLAIM)) == PGO_SYNCIO;
-
 		tsd_set(zfs_putpage_key, NULL);
 		zfs_range_unlock(rl);
 
@@ -6377,9 +6375,11 @@ zfs_netbsd_putpages(void *v)
 		 * reclaim. See the comment in zfs_netbsd_fsync.
 		 */
 
-		if (cleaned &&
-		    (commit || zfsvfs->z_os->os_sync == ZFS_SYNC_ALWAYS))
-			zil_commit(zfsvfs->z_log, zp->z_id);
+		if (cleaned && (flags & PGO_RECLAIM) == 0) {
+			if ((flags & PGO_SYNCIO) != 0
+			    || zfsvfs->z_os->os_sync == ZFS_SYNC_ALWAYS)
+				zil_commit(zfsvfs->z_log, zp->z_id);
+		}
 fail:
 		ZFS_EXIT(zfsvfs);
 		fstrans_done(vp->v_mount);
