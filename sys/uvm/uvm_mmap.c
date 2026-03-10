@@ -100,10 +100,12 @@ round_and_check(const struct vm_map *map, vaddr_t *addr, vsize_t *size)
 	*addr -= pageoff;
 
 	if (*size != 0) {
+		vsize_t orig = *size;
 		*size += pageoff;
 		*size = (vsize_t)round_page(*size);
-	} else if (*addr + *size < *addr) {
-		return ENOMEM;
+		if (*size < orig || *addr + *size < *addr) {
+			return ENOMEM;
+		}
 	}
 
 	return range_test(map, *addr, *size, false);
