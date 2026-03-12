@@ -664,7 +664,7 @@ sched_catchlwp(struct cpu_info *ci)
 	 * Be more aggressive if this CPU is first class, and the other
 	 * is not.
 	 */
-	gentle = cpu_is_better(curci, ci);
+	gentle = !cpu_is_better(curci, ci);
 
 	if (atomic_load_relaxed(&spc->spc_mcount) < (gentle ? min_catch : 1) ||
 	    curspc->spc_psid != spc->spc_psid) {
