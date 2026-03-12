@@ -486,9 +486,9 @@ cpu_is_better(struct cpu_info *ci1, struct cpu_info *ci2)
 
 	if ((ci1_flags & SPCF_1STCLASS) != 0 &&
 	    (ci2_flags & SPCF_1STCLASS) == 0)
-		return ci1;
+		return true;
 
-	return ci2;
+	return false;
 }
 
 #if defined(__HAVE_INTR_CONTROL)
