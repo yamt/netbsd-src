@@ -151,7 +151,7 @@ struct swapdev {
 
 	/*
 	 * the following members are only used for swap on VREG file.
-	 * swd_lock protects swd_active and vndxfers.
+	 * swd_lock protects swd_active.
 	 */
 	kmutex_t		swd_lock;
 	int			swd_bsize;	/* blocksize (bytes) */
@@ -169,32 +169,6 @@ struct swappri {
 	/* tailq of swapdevs at this priority */
 	LIST_ENTRY(swappri)	spi_swappri;      /* global list of pri's */
 };
-
-/*
- * The following two structures are used to keep track of data transfers
- * on swap devices associated with regular files.
- * NOTE: this code is more or less a copy of vnd.c; we use the same
- * structure names here to ease porting..
- */
-struct vndxfer {
-	struct buf	*vx_bp;		/* Pointer to parent buffer */
-	struct swapdev	*vx_sdp;
-	int		vx_error;
-	int		vx_pending;	/* # of pending aux buffers */
-	int		vx_flags;
-#define VX_BUSY		1
-#define VX_DEAD		2
-};
-
-struct vndbuf {
-	struct buf	vb_buf;
-	struct vndxfer	*vb_xfer;
-};
-
-/*
- * We keep a of pool vndbuf's and vndxfer structures.
- */
-static struct pool vndxfer_pool, vndbuf_pool;
 
 /*
  * local variables
@@ -301,11 +275,6 @@ uvm_swap_init(void)
 	if (swapmap == 0) {
 		panic("%s: vmem_create failed", __func__);
 	}
-
-	pool_init(&vndxfer_pool, sizeof(struct vndxfer), 0, 0, 0, "swp vnx",
-	    NULL, IPL_NONE);
-	pool_init(&vndbuf_pool, sizeof(struct vndbuf), 0, 0, 0, "swp vnd",
-	    NULL, IPL_NONE);
 
 	uvm_swap_init_done = true;
 
@@ -1340,6 +1309,29 @@ swopen(dev_t dev, int flag, int mode, struct lwp *l)
 	return ENODEV;
 }
 
+static void
+reassign(struct buf *bp, struct vnode *vp)
+{
+	/*
+	 * if we are doing a write, we have to redirect the i/o on
+	 * drum's v_numoutput counter to the swapdevs.
+	 */
+	if ((bp->b_flags & B_READ) == 0) {
+		mutex_enter(bp->b_objlock);
+		vwakeup(bp);	/* kills one 'v_numoutput' on drum */
+		mutex_exit(bp->b_objlock);
+		mutex_enter(vp->v_interlock);
+		vp->v_numoutput++;	/* put it on swapdev */
+		mutex_exit(vp->v_interlock);
+	}
+
+	/*
+	 * finally plug in swapdev vnode and start I/O
+	 */
+	bp->b_vp = vp;
+	bp->b_objlock = vp->v_interlock;
+}
+
 /*
  * swstrategy: perform I/O on the drum
  *
@@ -1400,25 +1392,7 @@ swstrategy(struct buf *bp)
 		 */
 		bp->b_blkno = bn;		/* swapdev block number */
 		bp->b_dev = sdp->swd_dev;	/* swapdev dev_t */
-
-		/*
-		 * if we are doing a write, we have to redirect the i/o on
-		 * drum's v_numoutput counter to the swapdevs.
-		 */
-		if ((bp->b_flags & B_READ) == 0) {
-			mutex_enter(bp->b_objlock);
-			vwakeup(bp);	/* kills one 'v_numoutput' on drum */
-			mutex_exit(bp->b_objlock);
-			mutex_enter(vp->v_interlock);
-			vp->v_numoutput++;	/* put it on swapdev */
-			mutex_exit(vp->v_interlock);
-		}
-
-		/*
-		 * finally plug in swapdev vnode and start I/O
-		 */
-		bp->b_vp = vp;
-		bp->b_objlock = vp->v_interlock;
+		reassign(bp, vp);
 		VOP_STRATEGY(vp, bp);
 		return;
 
@@ -1492,25 +1466,14 @@ const struct cdevsw swap_cdevsw = {
 static void
 sw_reg_strategy(struct swapdev *sdp, struct buf *bp, int bn)
 {
-	struct vnode	*vp;
-	struct vndxfer	*vnx;
+	struct vnode	*devvp;
 	daddr_t		nbn;
-	char 		*addr;
 	off_t		byteoff;
+	int		offset;
 	int		off, nra, error, sz, resid;
-	int		pending;
 	UVMHIST_FUNC(__func__); UVMHIST_CALLED(pdhist);
 
-	/*
-	 * allocate a vndxfer head for this transfer and point it to
-	 * our buffer.
-	 */
-	vnx = pool_get(&vndxfer_pool, PR_WAITOK);
-	vnx->vx_flags = VX_BUSY;
-	vnx->vx_error = 0;
-	vnx->vx_pending = 0;
-	vnx->vx_bp = bp;
-	vnx->vx_sdp = sdp;
+	bp->b_private = sdp;
 
 	/*
 	 * setup for main loop where we read filesystem blocks into
@@ -1518,22 +1481,22 @@ sw_reg_strategy(struct swapdev *sdp, struct buf *bp, int bn)
 	 */
 	error = 0;
 	bp->b_resid = bp->b_bcount;	/* nothing transferred yet! */
-	addr = bp->b_data;		/* current position in buffer */
 	byteoff = dbtob((uint64_t)bn);
 
+	offset = 0;
 	for (resid = bp->b_resid; resid; resid -= sz) {
-		struct vndbuf	*nbp;
+		struct buf *nbp;
 
 		/*
 		 * translate byteoffset into block number.  return values:
-		 *   vp = vnode of underlying device
-		 *  nbn = new block number (on underlying vnode dev)
-		 *  nra = num blocks we can read-ahead (excludes requested
-		 *	block)
+		 *   devvp = vnode of underlying device
+		 *     nbn = new block number (on underlying vnode dev)
+		 *     nra = num blocks we can read-ahead (excludes requested
+		 *           block)
 		 */
 		nra = 0;
 		error = VOP_BMAP(sdp->swd_vp, byteoff / sdp->swd_bsize,
-				 	&vp, &nbn, &nra);
+				 &devvp, &nbn, &nra);
 
 		if (error == 0 && nbn == (daddr_t)-1) {
 			/*
@@ -1558,9 +1521,7 @@ sw_reg_strategy(struct swapdev *sdp, struct buf *bp, int bn)
 		 * a hassle (in the write case).
 		 */
 		if (error) {
-			mutex_enter(&sdp->swd_lock);
-			vnx->vx_error = error;	/* pass error up */
-			goto out;
+			break;
 		}
 
 		/*
@@ -1573,44 +1534,18 @@ sw_reg_strategy(struct swapdev *sdp, struct buf *bp, int bn)
 
 		UVMHIST_LOG(pdhist, "sw_reg_strategy: "
 		    "vp %#jx/%#jx offset %#jx/%#jx",
-		    (uintptr_t)sdp->swd_vp, (uintptr_t)vp, byteoff, nbn);
+		    (uintptr_t)sdp->swd_vp, (uintptr_t)devvp, byteoff, nbn);
 
-		/*
-		 * now get a buf structure.   note that the vb_buf is
-		 * at the front of the nbp structure so that you can
-		 * cast pointers between the two structure easily.
-		 */
-		nbp = pool_get(&vndbuf_pool, PR_WAITOK);
-		buf_init(&nbp->vb_buf);
-		nbp->vb_buf.b_flags    = bp->b_flags;
-		nbp->vb_buf.b_cflags   = bp->b_cflags;
-		nbp->vb_buf.b_oflags   = bp->b_oflags;
-		nbp->vb_buf.b_bcount   = sz;
-		nbp->vb_buf.b_bufsize  = sz;
-		nbp->vb_buf.b_error    = 0;
-		nbp->vb_buf.b_data     = addr;
-		nbp->vb_buf.b_lblkno   = 0;
-		nbp->vb_buf.b_blkno    = nbn + btodb(off);
-		nbp->vb_buf.b_rawblkno = nbp->vb_buf.b_blkno;
-		nbp->vb_buf.b_iodone   = sw_reg_biodone;
-		nbp->vb_buf.b_vp       = vp;
-		nbp->vb_buf.b_objlock  = vp->v_interlock;
-		if (vp->v_type == VBLK) {
-			nbp->vb_buf.b_dev = vp->v_rdev;
-		}
-
-		nbp->vb_xfer = vnx;	/* patch it back in to vnx */
-
-		mutex_enter(&sdp->swd_lock);
-		if (vnx->vx_error != 0) {
-			buf_destroy(&nbp->vb_buf);
-			pool_put(&vndbuf_pool, nbp);
-			goto out;
-		}
-		vnx->vx_pending++;
+		nbp = getiobuf(devvp, true);
+		nestiobuf_setup(bp, nbp, offset, sz);
+		reassign(nbp, devvp);
+		nbp->b_blkno = nbn + btodb(off);
+		KASSERT(nbp->b_iodone == nestiobuf_iodone);
+		nbp->b_iodone = sw_reg_biodone;
 
 		/* sort it in and start I/O if we are not over our limit */
-		bufq_put(sdp->swd_tab, &nbp->vb_buf);
+		mutex_enter(&sdp->swd_lock);
+		bufq_put(sdp->swd_tab, nbp);
 		sw_reg_start(sdp);
 		mutex_exit(&sdp->swd_lock);
 
@@ -1618,23 +1553,9 @@ sw_reg_strategy(struct swapdev *sdp, struct buf *bp, int bn)
 		 * advance to the next I/O
 		 */
 		byteoff += sz;
-		addr += sz;
+		offset += sz;
 	}
-
-	mutex_enter(&sdp->swd_lock);
-out:
-	vnx->vx_flags &= ~VX_BUSY;
-	pending = vnx->vx_pending;
-	mutex_exit(&sdp->swd_lock);
-	if (pending == 0) {
-		error = vnx->vx_error;
-		pool_put(&vndxfer_pool, vnx);
-		if (error) {
-			bp->b_resid = bp->b_bcount;
-			bp->b_error = error;
-		}
-		biodone(bp);
-	}
+	nestiobuf_done(bp, resid, error);
 }
 
 /*
@@ -1696,12 +1617,11 @@ sw_reg_biodone(struct buf *bp)
 static void
 sw_reg_iodone(struct work *wk, void *dummy)
 {
-	struct vndbuf *vbp = (void *)wk;
-	struct vndxfer *vnx = vbp->vb_xfer;
-	struct buf *pbp = vnx->vx_bp;		/* parent buffer */
-	struct swapdev	*sdp = vnx->vx_sdp;
-	int resid, error;
-	KASSERT(&vbp->vb_buf.b_work == wk);
+	struct buf *nbp = (void *)wk;
+	struct buf *pbp = nbp->b_private;	/* parent buffer */
+	struct swapdev *sdp = pbp->b_private;
+
+	KASSERT(&nbp->b_work == wk);
 	UVMHIST_FUNC(__func__);
 	UVMHIST_CALLARGS(pdhist, "  vbp=%#jx vp=%#jx blkno=%#jx addr=%#jx",
 	    (uintptr_t)vbp, (uintptr_t)vbp->vb_buf.b_vp, vbp->vb_buf.b_blkno,
@@ -1709,54 +1629,14 @@ sw_reg_iodone(struct work *wk, void *dummy)
 	UVMHIST_LOG(pdhist, "  cnt=%#jx resid=%#jx",
 	    vbp->vb_buf.b_bcount, vbp->vb_buf.b_resid, 0, 0);
 
-	mutex_enter(&sdp->swd_lock);
-
-	resid = vbp->vb_buf.b_bcount - vbp->vb_buf.b_resid;
-	pbp->b_resid -= resid;
-	vnx->vx_pending--;
-
-	if (vbp->vb_buf.b_error != 0) {
-		/* pass error upward */
-		error = vbp->vb_buf.b_error ? vbp->vb_buf.b_error : EIO;
-		UVMHIST_LOG(pdhist, "  got error=%jd !", error, 0, 0, 0);
-		vnx->vx_error = error;
-	}
-
-	/*
-	 * kill vbp structure
-	 */
-	buf_destroy(&vbp->vb_buf);
-	pool_put(&vndbuf_pool, vbp);
-
-	/*
-	 * wrap up this transaction if it has run to completion or, in
-	 * case of an error, when all auxiliary buffers have returned.
-	 */
-	if (vnx->vx_error != 0) {
-		/* pass error upward */
-		error = vnx->vx_error;
-		if ((vnx->vx_flags & VX_BUSY) == 0 && vnx->vx_pending == 0) {
-			pbp->b_error = error;
-			pbp->b_resid = pbp->b_bcount;
-			biodone(pbp);
-			pool_put(&vndxfer_pool, vnx);
-		}
-	} else if (pbp->b_resid == 0) {
-		KASSERT(vnx->vx_pending == 0);
-		if ((vnx->vx_flags & VX_BUSY) == 0) {
-			UVMHIST_LOG(pdhist, "  iodone, pbp=%#jx error=%jd !",
-			    (uintptr_t)pbp, vnx->vx_error, 0, 0);
-			biodone(pbp);
-			pool_put(&vndxfer_pool, vnx);
-		}
-	}
+	nestiobuf_iodone(nbp);
 
 	/*
 	 * done!   start next swapdev I/O if one is pending
 	 */
+	mutex_enter(&sdp->swd_lock);
 	sdp->swd_active--;
 	sw_reg_start(sdp);
-
 	mutex_exit(&sdp->swd_lock);
 }
 
