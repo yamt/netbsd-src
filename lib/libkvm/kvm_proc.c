@@ -130,6 +130,7 @@ struct miniproc {
 	do { \
 		(p)->p_stat = (kp)->kp_proc.p_stat; \
 		(p)->p_pid = (kp)->kp_proc.p_pid; \
+		(p)->p_psstrp = (kp)->kp_proc.p_psstrp; \
 		(p)->p_paddr = (kp)->kp_eproc.e_paddr; \
 		(p)->p_vmspace = (kp)->kp_proc.p_vmspace; \
 	} while (0)
