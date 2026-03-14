@@ -2095,7 +2095,12 @@ sysctl_doeproc(SYSCTLFN_ARGS)
 			return SET_ERROR(EINVAL);
 		switch (op = name[0]) {
 		case KERN_PROC_ALL:
-			if (namelen != 1)
+			/*
+			 * note: kvm_getprocs(KERN_PROC_ALL) gives
+			 * us namelen=2. ignore the extra argument,
+			 * which is typically 0.
+			 */
+			if (namelen != 1 && namelen != 2)
 				return SET_ERROR(EINVAL);
 			arg = 0;
 			break;
