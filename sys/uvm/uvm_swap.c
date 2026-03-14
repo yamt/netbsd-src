@@ -144,15 +144,20 @@ struct swapdev {
 	struct vnode		*swd_vp;	/* backing vnode */
 	TAILQ_ENTRY(swapdev)	swd_next;	/* priority tailq */
 
-	int			swd_bsize;	/* blocksize (bytes) */
-	int			swd_maxactive;	/* max active i/o reqs */
-	struct bufq_state	*swd_tab;	/* buffer list */
-	int			swd_active;	/* number of active buffers */
-
 	volatile uint32_t	*swd_encmap;	/* bitmap of encrypted slots */
 	struct aesenc		swd_enckey;	/* AES key expanded for enc */
 	struct aesdec		swd_deckey;	/* AES key expanded for dec */
 	bool			swd_encinit;	/* true if keys initialized */
+
+	/*
+	 * the following members are only used for swap on VREG file.
+	 * swd_lock protects swd_active and vndxfers.
+	 */
+	kmutex_t		swd_lock;
+	int			swd_bsize;	/* blocksize (bytes) */
+	int			swd_maxactive;	/* max active i/o reqs */
+	struct bufq_state	*swd_tab;	/* buffer list */
+	int			swd_active;	/* number of active buffers */
 };
 
 /*
@@ -684,6 +689,7 @@ sys_swapctl(struct lwp *l, const struct sys_swapctl_args *uap,
 		priority = SCARG(uap, misc);
 		sdp = kmem_zalloc(sizeof(*sdp), KM_SLEEP);
 		spp = kmem_alloc(sizeof(*spp), KM_SLEEP);
+		mutex_init(&sdp->swd_lock, MUTEX_DEFAULT, IPL_NONE);
 		sdp->swd_flags = SWF_FAKE;
 		sdp->swd_vp = vp;
 		sdp->swd_dev = (vp->v_type == VBLK) ? vp->v_rdev : NODEV;
@@ -693,6 +699,7 @@ sys_swapctl(struct lwp *l, const struct sys_swapctl_args *uap,
 			error = EBUSY;
 			mutex_exit(&uvm_swap_data_lock);
 			bufq_free(sdp->swd_tab);
+			mutex_destroy(&sdp->swd_lock);
 			kmem_free(sdp, sizeof(*sdp));
 			kmem_free(spp, sizeof(*spp));
 			break;
@@ -720,6 +727,7 @@ sys_swapctl(struct lwp *l, const struct sys_swapctl_args *uap,
 			mutex_exit(&uvm_swap_data_lock);
 			bufq_free(sdp->swd_tab);
 			kmem_free(sdp->swd_path, sdp->swd_pathlen);
+			mutex_destroy(&sdp->swd_lock);
 			kmem_free(sdp, sizeof(*sdp));
 			break;
 		}
@@ -1263,6 +1271,7 @@ swap_off(struct lwp *l, struct swapdev *sdp)
 	    encmap_size(sdp->swd_drumsize));
 	explicit_memset(&sdp->swd_enckey, 0, sizeof sdp->swd_enckey);
 	explicit_memset(&sdp->swd_deckey, 0, sizeof sdp->swd_deckey);
+	mutex_destroy(&sdp->swd_lock);
 	kmem_free(sdp, sizeof(*sdp));
 	return (0);
 }
@@ -1459,7 +1468,7 @@ const struct bdevsw swap_bdevsw = {
 	.d_dump = nodump,
 	.d_psize = nosize,
 	.d_discard = nodiscard,
-	.d_flag = D_OTHER
+	.d_flag = D_OTHER | D_MPSAFE,
 };
 
 const struct cdevsw swap_cdevsw = {
@@ -1474,7 +1483,7 @@ const struct cdevsw swap_cdevsw = {
 	.d_mmap = nommap,
 	.d_kqfilter = nokqfilter,
 	.d_discard = nodiscard,
-	.d_flag = D_OTHER,
+	.d_flag = D_OTHER | D_MPSAFE,
 };
 
 /*
@@ -1488,7 +1497,8 @@ sw_reg_strategy(struct swapdev *sdp, struct buf *bp, int bn)
 	daddr_t		nbn;
 	char 		*addr;
 	off_t		byteoff;
-	int		s, off, nra, error, sz, resid;
+	int		off, nra, error, sz, resid;
+	int		pending;
 	UVMHIST_FUNC(__func__); UVMHIST_CALLED(pdhist);
 
 	/*
@@ -1548,7 +1558,7 @@ sw_reg_strategy(struct swapdev *sdp, struct buf *bp, int bn)
 		 * a hassle (in the write case).
 		 */
 		if (error) {
-			s = splbio();
+			mutex_enter(&sdp->swd_lock);
 			vnx->vx_error = error;	/* pass error up */
 			goto out;
 		}
@@ -1591,10 +1601,7 @@ sw_reg_strategy(struct swapdev *sdp, struct buf *bp, int bn)
 
 		nbp->vb_xfer = vnx;	/* patch it back in to vnx */
 
-		/*
-		 * Just sort by block number
-		 */
-		s = splbio();
+		mutex_enter(&sdp->swd_lock);
 		if (vnx->vx_error != 0) {
 			buf_destroy(&nbp->vb_buf);
 			pool_put(&vndbuf_pool, nbp);
@@ -1603,10 +1610,9 @@ sw_reg_strategy(struct swapdev *sdp, struct buf *bp, int bn)
 		vnx->vx_pending++;
 
 		/* sort it in and start I/O if we are not over our limit */
-		/* XXXAD locking */
 		bufq_put(sdp->swd_tab, &nbp->vb_buf);
 		sw_reg_start(sdp);
-		splx(s);
+		mutex_exit(&sdp->swd_lock);
 
 		/*
 		 * advance to the next I/O
@@ -1615,11 +1621,12 @@ sw_reg_strategy(struct swapdev *sdp, struct buf *bp, int bn)
 		addr += sz;
 	}
 
-	s = splbio();
-
-out: /* Arrive here at splbio */
+	mutex_enter(&sdp->swd_lock);
+out:
 	vnx->vx_flags &= ~VX_BUSY;
-	if (vnx->vx_pending == 0) {
+	pending = vnx->vx_pending;
+	mutex_exit(&sdp->swd_lock);
+	if (pending == 0) {
 		error = vnx->vx_error;
 		pool_put(&vndxfer_pool, vnx);
 		if (error) {
@@ -1628,7 +1635,6 @@ out: /* Arrive here at splbio */
 		}
 		biodone(bp);
 	}
-	splx(s);
 }
 
 /*
@@ -1642,6 +1648,8 @@ sw_reg_start(struct swapdev *sdp)
 	struct buf	*bp;
 	struct vnode	*vp;
 	UVMHIST_FUNC(__func__); UVMHIST_CALLED(pdhist);
+
+	KASSERT(mutex_owned(&sdp->swd_lock));
 
 	/* recursion control */
 	if ((sdp->swd_flags & SWF_BUSY) != 0)
@@ -1692,7 +1700,7 @@ sw_reg_iodone(struct work *wk, void *dummy)
 	struct vndxfer *vnx = vbp->vb_xfer;
 	struct buf *pbp = vnx->vx_bp;		/* parent buffer */
 	struct swapdev	*sdp = vnx->vx_sdp;
-	int s, resid, error;
+	int resid, error;
 	KASSERT(&vbp->vb_buf.b_work == wk);
 	UVMHIST_FUNC(__func__);
 	UVMHIST_CALLARGS(pdhist, "  vbp=%#jx vp=%#jx blkno=%#jx addr=%#jx",
@@ -1701,11 +1709,8 @@ sw_reg_iodone(struct work *wk, void *dummy)
 	UVMHIST_LOG(pdhist, "  cnt=%#jx resid=%#jx",
 	    vbp->vb_buf.b_bcount, vbp->vb_buf.b_resid, 0, 0);
 
-	/*
-	 * protect vbp at splbio and update.
-	 */
+	mutex_enter(&sdp->swd_lock);
 
-	s = splbio();
 	resid = vbp->vb_buf.b_bcount - vbp->vb_buf.b_resid;
 	pbp->b_resid -= resid;
 	vnx->vx_pending--;
@@ -1751,7 +1756,8 @@ sw_reg_iodone(struct work *wk, void *dummy)
 	 */
 	sdp->swd_active--;
 	sw_reg_start(sdp);
-	splx(s);
+
+	mutex_exit(&sdp->swd_lock);
 }
 
 
