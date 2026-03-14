@@ -303,9 +303,9 @@ uvm_swap_init(void)
 	}
 
 	pool_init(&vndxfer_pool, sizeof(struct vndxfer), 0, 0, 0, "swp vnx",
-	    NULL, IPL_BIO);
+	    NULL, IPL_NONE);
 	pool_init(&vndbuf_pool, sizeof(struct vndbuf), 0, 0, 0, "swp vnd",
-	    NULL, IPL_BIO);
+	    NULL, IPL_NONE);
 
 	uvm_swap_init_done = true;
 
@@ -1148,7 +1148,7 @@ swap_on(struct lwp *l, struct swapdev *sdp)
 		if (sw_reg_count++ == 0) {
 			KASSERT(sw_reg_workqueue == NULL);
 			if (workqueue_create(&sw_reg_workqueue, "swapiod",
-			    sw_reg_iodone, NULL, PRIBIO, IPL_BIO, 0) != 0)
+			    sw_reg_iodone, NULL, PRIBIO, IPL_SOFTBIO, 0) != 0)
 				panic("%s: workqueue_create failed", __func__);
 		}
 	}
