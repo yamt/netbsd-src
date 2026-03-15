@@ -1052,7 +1052,11 @@ swap_on(struct lwp *l, struct swapdev *sdp)
 
 	/*
 	 * allocate space to for swap encryption state and mark the
-	 * keys uninitialized so we generate them lazily
+	 * keys uninitialized so we generate them lazily.
+	 *
+	 * we defer the key generation to help to maximize the amount
+	 * of data fed into the entropy pool before generating a key,
+	 * for the benefit of machines without HWRNG.
 	 */
 	sdp->swd_encmap = kmem_zalloc(encmap_size(npages), KM_SLEEP);
 	sdp->swd_encinit = false;
