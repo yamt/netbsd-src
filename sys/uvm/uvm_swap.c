@@ -1310,18 +1310,14 @@ swopen(dev_t dev, int flag, int mode, struct lwp *l)
 }
 
 static void
-reassign(struct buf *bp, struct vnode *vp)
+iobuf_redirect(struct buf *bp, struct vnode *vp)
 {
-	/*
-	 * if we are doing a write, we have to redirect the i/o on
-	 * drum's v_numoutput counter to the swapdevs.
-	 */
 	if ((bp->b_flags & B_READ) == 0) {
 		mutex_enter(bp->b_objlock);
-		vwakeup(bp);	/* kills one 'v_numoutput' on drum */
+		vwakeup(bp);
 		mutex_exit(bp->b_objlock);
 		mutex_enter(vp->v_interlock);
-		vp->v_numoutput++;	/* put it on swapdev */
+		vp->v_numoutput++;
 		mutex_exit(vp->v_interlock);
 	}
 
@@ -1389,10 +1385,12 @@ swstrategy(struct buf *bp)
 		/*
 		 * must convert "bp" from an I/O on /dev/drum to an I/O
 		 * on the swapdev (sdp).
+		 *
+		 * if we are doing a write, we have to redirect the i/o on
+		 * drum's v_numoutput counter to the swapdev's.
 		 */
+		iobuf_redirect(bp, vp);
 		bp->b_blkno = bn;		/* swapdev block number */
-		bp->b_dev = sdp->swd_dev;	/* swapdev dev_t */
-		reassign(bp, vp);
 		VOP_STRATEGY(vp, bp);
 		return;
 
@@ -1538,7 +1536,7 @@ sw_reg_strategy(struct swapdev *sdp, struct buf *bp, int bn)
 
 		nbp = getiobuf(devvp, true);
 		nestiobuf_setup(bp, nbp, offset, sz);
-		reassign(nbp, devvp);
+		iobuf_redirect(nbp, devvp);
 		nbp->b_blkno = nbn + btodb(off);
 		KASSERT(nbp->b_iodone == nestiobuf_iodone);
 		nbp->b_iodone = sw_reg_biodone;
@@ -1550,12 +1548,18 @@ sw_reg_strategy(struct swapdev *sdp, struct buf *bp, int bn)
 		mutex_exit(&sdp->swd_lock);
 
 		/*
+		 * at this point "nbp" might have been freed.
+		 */
+
+		/*
 		 * advance to the next I/O
 		 */
 		byteoff += sz;
 		offset += sz;
 	}
-	nestiobuf_done(bp, resid, error);
+	if (resid > 0) {
+		nestiobuf_done(bp, resid, error);
+	}
 }
 
 /*
@@ -1623,21 +1627,22 @@ sw_reg_iodone(struct work *wk, void *dummy)
 
 	KASSERT(&nbp->b_work == wk);
 	UVMHIST_FUNC(__func__);
-	UVMHIST_CALLARGS(pdhist, "  vbp=%#jx vp=%#jx blkno=%#jx addr=%#jx",
-	    (uintptr_t)vbp, (uintptr_t)vbp->vb_buf.b_vp, vbp->vb_buf.b_blkno,
-	    (uintptr_t)vbp->vb_buf.b_data);
+	UVMHIST_CALLARGS(pdhist, "  bp=%#jx vp=%#jx blkno=%#jx addr=%#jx",
+	    (uintptr_t)nbp, (uintptr_t)nbp->b_vp, nbp->b_blkno,
+	    (uintptr_t)nbp->b_data);
 	UVMHIST_LOG(pdhist, "  cnt=%#jx resid=%#jx",
-	    vbp->vb_buf.b_bcount, vbp->vb_buf.b_resid, 0, 0);
-
-	nestiobuf_iodone(nbp);
+	    nbp->b_bcount, nbp->b_resid, 0, 0);
 
 	/*
-	 * done!   start next swapdev I/O if one is pending
+	 * start next swapdev I/O if one is pending
 	 */
 	mutex_enter(&sdp->swd_lock);
+	KASSERT(sdp->swd_active > 0);
 	sdp->swd_active--;
 	sw_reg_start(sdp);
 	mutex_exit(&sdp->swd_lock);
+
+	nestiobuf_iodone(nbp);
 }
 
 
