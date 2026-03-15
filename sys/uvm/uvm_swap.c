@@ -1530,18 +1530,12 @@ sw_reg_strategy(struct swapdev *sdp, struct buf *bp, int bn)
 		    "vp %#jx/%#jx offset %#jx/%#jx",
 		    (uintptr_t)sdp->swd_vp, (uintptr_t)devvp, byteoff, nbn);
 
-		/* use the bp directly if we can */
-		if (offset == 0 && sz == resid) {
-			nbp = bp;
-			bp = NULL; /* just in case */
-		} else {
-			nbp = getiobuf(devvp, true);
-			nestiobuf_setup(bp, nbp, offset, sz);
-			KASSERT(nbp->b_iodone == nestiobuf_iodone);
-			nbp->b_iodone = sw_reg_biodone;
-		}
+		nbp = getiobuf(devvp, true);
+		nestiobuf_setup(bp, nbp, offset, sz);
 		iobuf_redirect(nbp, devvp);
 		nbp->b_blkno = nbn + btodb(off);
+		KASSERT(nbp->b_iodone == nestiobuf_iodone);
+		nbp->b_iodone = sw_reg_biodone;
 
 		/* sort it in and start I/O if we are not over our limit */
 		mutex_enter(&sdp->swd_lock);
@@ -1560,7 +1554,6 @@ sw_reg_strategy(struct swapdev *sdp, struct buf *bp, int bn)
 		offset += sz;
 	}
 	if (resid > 0) {
-		KASSERT(bp != NULL);
 		KASSERT(error != 0);
 		nestiobuf_done(bp, resid, error);
 	}
