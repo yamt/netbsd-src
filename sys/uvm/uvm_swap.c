@@ -1526,6 +1526,7 @@ sw_reg_strategy(struct swapdev *sdp, struct buf *bp, int bn)
 		/*
 		 * compute the size ("sz") of this transfer (in bytes).
 		 */
+		nra = 0; /* XXXdebug */
 		off = byteoff % sdp->swd_bsize;
 		sz = (1 + nra) * sdp->swd_bsize - off;
 		if (sz > resid)
