@@ -990,7 +990,7 @@ swap_on(struct lwp *l, struct swapdev *sdp)
 			goto bad;
 		nblocks = (int)btodb(va.va_size);
 		sdp->swd_bsize = 1 << vp->v_mount->mnt_fs_bshift;
-		printf("swd_bsize %d\n", swd_bsize);
+		printf("swd_bsize %d\n", sdp->swd_bsize);
 		/*
 		 * limit the max # of outstanding I/O requests we issue
 		 * at any one time.   take it easy on NFS servers.
