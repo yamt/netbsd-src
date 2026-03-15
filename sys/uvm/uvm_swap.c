@@ -1595,12 +1595,6 @@ sw_reg_start(struct swapdev *sdp)
 		    (uintptr_t)bp, (uintptr_t)bp->b_vp, (uintptr_t)bp->b_blkno,
 		    bp->b_bcount);
 		vp = bp->b_vp;
-		KASSERT(bp->b_objlock == vp->v_interlock);
-		if ((bp->b_flags & B_READ) == 0) {
-			mutex_enter(vp->v_interlock);
-			vp->v_numoutput++;
-			mutex_exit(vp->v_interlock);
-		}
 		VOP_STRATEGY(vp, bp);
 	}
 	sdp->swd_flags &= ~SWF_BUSY;
