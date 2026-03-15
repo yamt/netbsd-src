@@ -990,6 +990,7 @@ swap_on(struct lwp *l, struct swapdev *sdp)
 			goto bad;
 		nblocks = (int)btodb(va.va_size);
 		sdp->swd_bsize = 1 << vp->v_mount->mnt_fs_bshift;
+		printf("swd_bsize %d\n", swd_bsize);
 		/*
 		 * limit the max # of outstanding I/O requests we issue
 		 * at any one time.   take it easy on NFS servers.
@@ -2080,8 +2081,11 @@ uvm_swap_io(struct vm_page **pps, int startslot, int npages, int flags)
 			s -= sdp->swd_drumoffset;
 			KASSERT(s < sdp->swd_drumsize);
 			if ((atomic_load_relaxed(&sdp->swd_encmap[s/32]) &
-				__BIT(s%32)) == 0)
+				__BIT(s%32)) == 0) {
+				if (swap_encrypt)
+					printf("unencrypted swapin at slot %d\n", s);
 				continue;
+			}
 			uvm_swap_decryptpage(sdp,
 			    (void *)(kva + (vsize_t)i*PAGE_SIZE), s);
 		}
