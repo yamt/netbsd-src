@@ -1539,7 +1539,14 @@ zfs_domount(vfs_t *vfsp, char *osname)
 	vfsp->mnt_stat.f_fsidx.__fsid_val[0] = fsid_guid;
 	vfsp->mnt_stat.f_fsidx.__fsid_val[1] = ((fsid_guid>>32) << 8) |
 	    makefstype(vfsp->mnt_op->vfs_name) & 0xFF;
-	vfsp->mnt_stat.f_fsid = fsid_guid;
+	/*
+	 * While NetBSD's dev_t is 64-bit, some applications
+	 * seem to assume the round-trip with makedev macros.
+	 * ie. st_dev == makedev(major(st_dev), minor(st_dev))
+	 * unfortunately, our version of these macros only
+	 * preserve the lower 32-bits.
+	 */
+	vfsp->mnt_stat.f_fsid = (uint32_t)((fsid_guid >> 32) ^ fsid_guid);
 #endif
 
 	/*
