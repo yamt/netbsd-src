@@ -1559,6 +1559,7 @@ sw_reg_strategy(struct swapdev *sdp, struct buf *bp, int bn)
 		offset += sz;
 	}
 	if (resid > 0) {
+		printf("sw_reg_strategy: error %d\n", error);
 		KASSERT(error != 0);
 		nestiobuf_done(bp, resid, error);
 	}
