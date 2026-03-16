@@ -1835,7 +1835,7 @@ uvm_swap_get(struct vm_page *page, int swslot, int flags)
 {
 	int error;
 
-	atomic_inc_uint(&uvmexp.pgswapin);
+	atomic_inc_uint(&uvmexp.nswget);
 	KASSERT(flags & PGO_SYNCIO);
 	if (swslot == SWSLOT_BAD) {
 		return EIO;

@@ -586,6 +586,7 @@ int wiredmax;   /* max number of wired pages */
 int nswapdev;   /* number of configured swap devices in system */
 int swpages;    /* number of PAGE_SIZE'ed swap pages */
 int swpginuse;  /* number of swap pages in use */
+int nswget;     /* number of times fault calls uvm_swap_get() */
 int nanon;      /* number total of anon's in system */
 int nfreeanon;  /* number of free anon's */
 

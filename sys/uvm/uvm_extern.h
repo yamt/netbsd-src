@@ -348,7 +348,7 @@ struct uvmexp {
 	int swpgavail;	/* number of swap pages currently available */
 	int swpginuse;	/* number of swap pages in use */
 	int swpgonly;	/* number of swap pages in use, not also in RAM */
-	int pgswapin;	/* number of times fault calls uvm_swap_get() */
+	int nswget;	/* number of times fault calls uvm_swap_get() */
 
 	/* stat counters.  XXX: should be 64-bit counters */
 	int faults;		/* page fault count */
@@ -361,7 +361,7 @@ struct uvmexp {
 				/* pageouts are in pdpageouts below */
 	int _unused1;
 	int _unused2;
-	int _unused4;
+	int pgswapin;		/* pages swapped in */
 	int pgswapout;		/* pages swapped out */
 	int forks;  		/* forks */
 	int forks_ppwait;	/* forks where parent waits */
@@ -443,7 +443,7 @@ struct uvmexp_sysctl {
 	int64_t	swpages;
 	int64_t	swpginuse;
 	int64_t	swpgonly;
-	int64_t	pgswapin;
+	int64_t	nswget;
 	int64_t	unused1;		/* unused; was nanon */
 	int64_t cpuhit;
 	int64_t cpumiss;
@@ -456,7 +456,7 @@ struct uvmexp_sysctl {
 	int64_t	pageins;
 	int64_t	swapins;		/* unused */
 	int64_t	swapouts;		/* unused */
-	int64_t	unused2;		/* unused */
+	int64_t	pgswapin;		/* unused */
 	int64_t	pgswapout;
 	int64_t	forks;
 	int64_t	forks_ppwait;
