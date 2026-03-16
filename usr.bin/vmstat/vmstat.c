@@ -929,10 +929,9 @@ dosum(void)
 		COPY(nswapdev);
 		COPY(swpages);
 		COPY(swpginuse);
-		COPY(nswget);
+		COPY(pgswapin);
 		COPY(pageins);
 		COPY(pdpageouts);
-		COPY(pgswapin);
 		COPY(pgswapout);
 		COPY(forks);
 		COPY(forks_ppwait);
@@ -1015,7 +1014,6 @@ dosum(void)
 	(void)printf("%9" PRIu64 " swap devices\n", uvmexp.nswapdev);
 	(void)printf("%9" PRIu64 " swap pages\n", uvmexp.swpages);
 	(void)printf("%9" PRIu64 " swap pages in use\n", uvmexp.swpginuse);
-	(void)printf("%9" PRIu64 " swap allocations\n", uvmexp.nswget);
 
 	cpucounters(&cc);
 
