@@ -121,7 +121,7 @@ sysctl_vm_uvmexp2(SYSCTLFN_ARGS)
 	u.swpages = uvmexp.swpages;
 	u.swpginuse = uvmexp.swpginuse;
 	u.swpgonly = uvmexp.swpgonly;
-	u.nswget = uvmexp.nswget;
+	u.pgswapin = uvmexp.pgswapin;
 	u.cpuhit = cpu_count_get(CPU_COUNT_CPUHIT);
 	u.cpumiss = cpu_count_get(CPU_COUNT_CPUMISS);
 	u.faults = cpu_count_get(CPU_COUNT_NFAULT);
@@ -131,7 +131,6 @@ sysctl_vm_uvmexp2(SYSCTLFN_ARGS)
 	u.softs = cpu_count_get(CPU_COUNT_NSOFT);
 	u.syscalls = cpu_count_get(CPU_COUNT_NSYSCALL);
 	u.pageins = cpu_count_get(CPU_COUNT_PAGEINS);
-	u.pgswapin = 0; /* unused */
 	u.pgswapout = uvmexp.pgswapout;
 	u.forks = cpu_count_get(CPU_COUNT_FORKS);
 	u.forks_ppwait = cpu_count_get(CPU_COUNT_FORKS_PPWAIT);
