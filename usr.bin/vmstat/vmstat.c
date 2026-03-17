@@ -967,7 +967,6 @@ dosum(void)
 		COPY(pdobscan);
 		COPY(pdreact);
 		COPY(pdbusy);
-		COPY(pdpending);
 		COPY(pddeact);
 		COPY(bootpages);
 #undef COPY
@@ -1074,7 +1073,6 @@ dosum(void)
 	(void)printf("%9" PRIu64 " object pages scanned by daemon\n", uvmexp.pdobscan);
 	(void)printf("%9" PRIu64 " pages reactivated\n", uvmexp.pdreact);
 	(void)printf("%9" PRIu64 " pages found busy by daemon\n", uvmexp.pdbusy);
-	(void)printf("%9" PRIu64 " total pending pageouts\n", uvmexp.pdpending);
 	(void)printf("%9" PRIu64 " pages deactivated\n", uvmexp.pddeact);
 	(void)printf("%9" PRIu64 " per-cpu stats synced\n", uvmexp.countsyncall);
 	(void)printf("%9" PRIu64 " anon pages possibly dirty\n", uvmexp.anonunknown);
