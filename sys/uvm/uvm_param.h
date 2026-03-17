@@ -191,12 +191,18 @@ extern const int *const uvmexp_pageshift;
 #define	atop(x)		(((paddr_t)(x)) >> PAGE_SHIFT)
 #define	ptoa(x)		(((paddr_t)(x)) << PAGE_SHIFT)
 
+#define __is_unsigned(x) _Generic((x), \
+	unsigned int: 1, \
+	unsigned long: 1, \
+	unsigned long long: 1, \
+	default: 0)
+
 /*
  * Round off or truncate to the nearest page.  These will work
  * for either addresses or counts (i.e., 1 byte rounds to 1 page).
  */
-#define	round_page(x)	(((x) + PAGE_MASK) & ~PAGE_MASK)
-#define	trunc_page(x)	((x) & ~PAGE_MASK)
+#define	round_page(x)	({_Static_assert(__is_unsigned(x));(((x) + PAGE_MASK) & ~PAGE_MASK);})
+#define	trunc_page(x)	({_Static_assert(__is_unsigned(x));((x) & ~PAGE_MASK);})
 
 #ifndef VM_DEFAULT_ADDRESS_BOTTOMUP
 #define VM_DEFAULT_ADDRESS_BOTTOMUP(da, sz) \
