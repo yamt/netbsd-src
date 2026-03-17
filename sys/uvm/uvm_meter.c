@@ -164,7 +164,6 @@ sysctl_vm_uvmexp2(SYSCTLFN_ARGS)
 	u.pdreact = uvmexp.pdreact;
 	u.pdbusy = uvmexp.pdbusy;
 	u.pdpageouts = uvmexp.pdpageouts;
-	u.pdpending = uvmexp.pdpending;
 	u.pddeact = uvmexp.pddeact;
 	u.execpages = cpu_count_get(CPU_COUNT_EXECPAGES);
 	u.colorhit = cpu_count_get(CPU_COUNT_COLORHIT);

@@ -872,13 +872,6 @@ uvmpd_scan_queue(void)
 
 		swapcluster_flush(&swc, false);
 
-		/*
-		 * the pageout is in progress.  bump counters and set up
-		 * for the next loop.
-		 */
-
-		atomic_inc_uint(&uvmexp.pdpending);
-
 #else /* defined(VMSWAP) */
 		uvm_pagelock(p);
 		uvm_pageactivate(p);

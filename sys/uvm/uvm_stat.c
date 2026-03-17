@@ -133,8 +133,8 @@ uvmexp_print(void (*pr)(const char *, ...)
 	    uvmexp.pdanscan);
 	(*pr)("    busy=%d, freed=%d, reactivate=%d, deactivate=%d\n",
 	    uvmexp.pdbusy, uvmexp.pdfreed, uvmexp.pdreact, uvmexp.pddeact);
-	(*pr)("    pageouts=%d, pending=%d, nswget=%d\n", uvmexp.pdpageouts,
-	    uvmexp.pdpending, uvmexp.nswget);
+	(*pr)("    pageouts=%d, nswget=%d\n", uvmexp.pdpageouts,
+	    uvmexp.nswget);
 	(*pr)("    nswapdev=%d, swpgavail=%d\n",
 	    uvmexp.nswapdev, uvmexp.swpgavail);
 	(*pr)("    swpages=%d, swpginuse=%d, swpgonly=%d, paging=%d\n",

@@ -408,7 +408,7 @@ struct uvmexp {
 	int pdreact;	/* number of pages daemon reactivated since boot */
 	int pdbusy;	/* number of times daemon found a busy page */
 	int pdpageouts;	/* number of times daemon started a pageout */
-	int pdpending;	/* number of times daemon got a pending pageout */
+	int pdpending;	/* unused: number of times daemon got a pending pageout */
 	int pddeact;	/* number of pages daemon deactivates */
 	int pdreanon;	/* anon pages reactivated due to thresholds */
 	int pdrefile;	/* file pages reactivated due to thresholds */
@@ -492,7 +492,7 @@ struct uvmexp_sysctl {
 	int64_t	pdreact;
 	int64_t	pdbusy;
 	int64_t	pdpageouts;
-	int64_t	pdpending;
+	int64_t	pdpending;		/* unused */
 	int64_t	pddeact;
 	int64_t	anonpages;
 	int64_t	filepages;
