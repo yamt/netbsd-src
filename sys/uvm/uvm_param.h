@@ -209,6 +209,20 @@ extern const int *const uvmexp_pageshift;
     round_page((vaddr_t)(da) + (vsize_t)maxdmap)
 #endif
 
+/*
+ * macros to round/trunc off_t/voff_t for VOP_PUTPAGES and similar
+ * functions.
+ *
+ * note that, because off_t/voff_t is signed, "+ PAGE_MASK" in round_page()
+ * can overflow, which is an UD, and typical compilers returns a negative
+ * value, which is not safe to pass to VOP_PUTPAGES and similar apis.
+ * off_round_page() detects such a case and returns 0, which means
+ * "up to the end of the object" for VOP_PUTPAGES and similar apis.
+ * off_trunc_page() is just for a symmetry.
+ */
+#define	off_round_page(x)	((x) <= INT64_MAX - PAGE_MASK ? ((x) + PAGE_MASK) & ~PAGE_MASK : 0)
+#define	off_trunc_page(x)	(((x) & ~PAGE_MASK))
+
 extern unsigned int user_stack_guard_size;
 extern unsigned int user_thread_stack_guard_size;
 #ifndef VM_DEFAULT_ADDRESS_TOPDOWN
