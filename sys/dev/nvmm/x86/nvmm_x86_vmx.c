@@ -48,6 +48,7 @@ __KERNEL_RCSID(0, "$NetBSD: nvmm_x86_vmx.c,v 1.92 2026/02/08 11:46:52 nia Exp $"
 #include <x86/specialreg.h>
 #include <x86/dbregs.h>
 #include <x86/cpu_counter.h>
+#include <x86/nmi.h>
 
 #include <machine/cpuvar.h>
 #include <machine/pmap_private.h>
@@ -1203,6 +1204,7 @@ static void
 vmx_exit_exc_nmi(struct nvmm_machine *mach, struct nvmm_cpu *vcpu,
     struct nvmm_vcpu_exit *exit)
 {
+	struct trapframe fake;
 	uint64_t qual;
 
 	qual = vmx_vmread(VMCS_EXIT_INTR_INFO);
@@ -1212,6 +1214,20 @@ vmx_exit_exc_nmi(struct nvmm_machine *mach, struct nvmm_cpu *vcpu,
 	}
 	if (__SHIFTOUT(qual, INTR_INFO_TYPE) != INTR_TYPE_NMI) {
 		goto error;
+	}
+
+	/*
+	 * this fake frame is ok for tprof.
+	 */
+	memset(&fake, 0, sizeof(fake));
+#if defined(__x86_64__)
+	fake.tf_rip = (uintptr_t)vmx_exit_exc_nmi;
+#else
+	fake.tf_eip = (uintptr_t)vmx_exit_exc_nmi;
+#endif
+	if (!nmi_dispatch(&fake)) {
+		/* XXX what to do for kgdb/ddb? */
+		x86_nmi();
 	}
 
 	exit->reason = NVMM_VCPU_EXIT_NONE;
