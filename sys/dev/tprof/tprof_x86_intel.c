@@ -137,6 +137,10 @@ tprof_intel_configure_event(u_int counter, const tprof_param_t *param)
 {
 	uint64_t evtval;
 
+	printf("%s: PERFEVTSEL_EVENT_SELECT=0x%" PRIx64
+        " PERFEVTSEL_UNIT_MASK=0x%" PRIx64
+        " p_value=%" PRIu64 "\n",
+	    __func__, param->p_event, param->p_unit, param->p_value);
 	evtval =
 	    __SHIFTIN(param->p_event, PERFEVTSEL_EVENT_SELECT) |
 	    __SHIFTIN(param->p_unit, PERFEVTSEL_UNIT_MASK) |
@@ -250,6 +254,9 @@ tprof_intel_ident(void)
 		return TPROF_IDENT_NONE;
 
 	counter_bitwidth = __SHIFTOUT(descs[0], CPUID_PERF_NBWGPPC);
+	printf("%s: counter_bitwidth=%u ncounters=%u\n", __func__,
+	    counter_bitwidth,
+	    (unsigned int)__SHIFTOUT(descs[0], CPUID_PERF_NGPPC));
 
 	return TPROF_IDENT_INTEL_GENERIC;
 }
