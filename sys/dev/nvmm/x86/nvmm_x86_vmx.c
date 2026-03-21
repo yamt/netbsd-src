@@ -2304,6 +2304,12 @@ vmx_vcpu_run(struct nvmm_machine *mach, struct nvmm_cpu *vcpu,
 		}
 		cpudata->gcr2 = rcr2();
 		vmx_htlb_flush_ack(cpudata, machgen);
+		exitcode = vmx_vmread(VMCS_EXIT_REASON);
+		exitcode &= __BITS(15,0);
+		if (exitcode == VMCS_EXITCODE_EXC_NMI) {
+			/* handle nmi before vmx_sti() */
+			vmx_exit_exc_nmi(mach, vcpu, exit);
+		}
 		vmx_sti();
 		vmx_vcpu_guest_fpu_leave(vcpu);
 
@@ -2315,12 +2321,9 @@ vmx_vcpu_run(struct nvmm_machine *mach, struct nvmm_cpu *vcpu,
 
 		launched = true;
 
-		exitcode = vmx_vmread(VMCS_EXIT_REASON);
-		exitcode &= __BITS(15,0);
-
 		switch (exitcode) {
 		case VMCS_EXITCODE_EXC_NMI:
-			vmx_exit_exc_nmi(mach, vcpu, exit);
+                        /* handled earlier */
 			break;
 		case VMCS_EXITCODE_EXT_INT:
 			exit->reason = NVMM_VCPU_EXIT_NONE;
