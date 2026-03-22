@@ -27,6 +27,9 @@
 
 #include <sys/zfs_context.h>
 #include <sys/spa.h>
+#ifdef __NetBSD__
+#include <sys/spa_impl.h>
+#endif
 #include <sys/refcount.h>
 #include <sys/vdev_disk.h>
 #include <sys/vdev_impl.h>
@@ -35,6 +38,9 @@
 #include <sys/sunldi.h>
 #include <sys/fm/fs/zfs.h>
 #include <sys/disk.h>
+#ifdef __NetBSD__
+#include <sys/disklabel.h>
+#endif
 #include <sys/dkio.h>
 #include <sys/workqueue.h>
 
@@ -137,6 +143,160 @@ vdev_disk_flush(struct work *work, void *cookie)
 	vdev_disk_io_intr(bp);
 }
 
+#ifdef __NetBSD__
+
+/* ported from zpool_read_label in libzfs */
+static int
+disk_read_config(vnode_t *vp, nvlist_t **config)
+{
+	vdev_label_t *label;
+	uint64_t state, txg;
+	int l;
+	uint64_t nsectors;
+	unsigned int sector_size;
+	uint64_t size;
+	int error;
+
+	error = getdisksize(vp, &nsectors, &sector_size);
+	if (error != 0)
+		return error;
+
+	if (UINT64_MAX / nsectors < sector_size)
+		return EOVERFLOW;
+
+	size = P2ALIGN_TYPED(nsectors * sector_size, sizeof (vdev_label_t),
+			     uint64_t);
+	ASSERT3U(size / nsectors, ==, sector_size);
+
+	if ((label = kmem_alloc(sizeof (vdev_label_t), KM_SLEEP)) == NULL)
+		return ENOMEM;
+
+	for (l = 0; l < VDEV_LABELS; l++) {
+		error = vn_rdwr(UIO_READ, vp, (caddr_t)label,
+		    sizeof (vdev_label_t), vdev_label_offset(size, l, 0),
+		    UIO_SYSSPACE, 0, RLIM64_INFINITY, kcred, NULL);
+		if (error != 0)
+			continue;
+
+		if (nvlist_unpack(label->vl_vdev_phys.vp_nvlist,
+		    sizeof (label->vl_vdev_phys.vp_nvlist), config, 0) != 0)
+			continue;
+
+		if (nvlist_lookup_uint64(*config, ZPOOL_CONFIG_POOL_STATE,
+		    &state) != 0 || state > POOL_STATE_L2CACHE) {
+			nvlist_free(*config);
+			continue;
+		}
+
+		if (state != POOL_STATE_SPARE && state != POOL_STATE_L2CACHE &&
+		    (nvlist_lookup_uint64(*config, ZPOOL_CONFIG_POOL_TXG,
+		    &txg) != 0 || txg == 0)) {
+			nvlist_free(*config);
+			continue;
+		}
+
+		kmem_free(label, sizeof(*label));
+		return (0);
+	}
+
+	kmem_free(label, sizeof(*label));
+	*config = NULL;
+	return (0);
+}
+
+static int
+disk_read_vdev_guid(vnode_t *vp, uint64_t *resultp)
+{
+	nvlist_t *config;
+	int error;
+
+	*resultp = 0;
+
+	error = disk_read_config(vp, &config);
+	if (error != 0)
+		return error;
+	if (config == NULL)
+		return ENOENT;
+
+	(void) nvlist_lookup_uint64(config, ZPOOL_CONFIG_GUID, resultp);
+	nvlist_free(config);
+
+	return 0;
+}
+
+static boolean_t
+device_is_eligible_for_vdev(device_t device)
+{
+	if (device_class(device) != DV_DISK)
+		return B_FALSE;
+
+	/* XXX better check? */
+	if (device_is_a(device, "dk") ||
+	    device_is_a(device, "ld") ||
+	    device_is_a(device, "wd") ||
+	    device_is_a(device, "sd")) {
+		return B_TRUE;
+	}
+
+	return B_FALSE;
+}
+
+static int
+open_disk_by_vdev_guid(uint64_t vdev_guid, vnode_t **vpp)
+{
+	device_t device;
+	deviter_t iter;
+
+	for (device = deviter_first(&iter, DEVITER_F_ROOT_FIRST);
+	    device != NULL; device = deviter_next(&iter)) {
+		vnode_t *vp;
+		uint64_t guid;
+		devmajor_t major;
+		devminor_t minor;
+		dev_t dev;
+		int error;
+
+		if (!device_is_eligible_for_vdev(device))
+			continue;
+
+		major = devsw_name2blk(device_xname(device), NULL, 0);
+		minor = minor(device_unit(device));
+		if (device_is_a(device, "dk"))
+			dev = makedev(major, minor);
+		else
+			dev = MAKEDISKDEV(major, minor, RAW_PART);
+		error = vn_bdev_open(dev, &vp, curlwp);
+		if (error != 0)
+			continue;
+
+		if (disk_read_vdev_guid(vp, &guid) == 0 &&
+		    guid == vdev_guid) {
+			printf("ZFS: vdev %" PRIx64 " found: %s (bdev %" PRIu32
+			       ":%" PRIu32 ")\n", vdev_guid,
+			       device_xname(device), (uint32_t)major,
+			       (uint32_t)minor);
+			*vpp = vp;
+			return 0;
+		}
+
+		vn_close(vp, FREAD|FWRITE, kcred);
+	}
+
+	return ENOENT;
+}
+
+static boolean_t
+check_guid(vdev_t *vd)
+{
+	/* this condition is a copy-and-paste from vdev_geom.c */
+	return !(vd->vdev_spa->spa_splitting_newspa ||
+	         (vd->vdev_prevstate == VDEV_STATE_UNKNOWN &&
+	          vd->vdev_spa->spa_load_state == SPA_LOAD_NONE ||
+	          vd->vdev_spa->spa_load_state == SPA_LOAD_CREATE));
+}
+
+#endif /* __NetBSD__ */
+
 static int
 vdev_disk_open(vdev_t *vd, uint64_t *psize, uint64_t *max_psize,
     uint64_t *ashift, uint64_t *pashift)
@@ -208,6 +368,40 @@ vdev_disk_open(vdev_t *vd, uint64_t *psize, uint64_t *max_psize,
 
 	error = vn_open(vd->vdev_path, UIO_SYSSPACE, FREAD|FWRITE, 0,
 	    &vp, CRCREAT, 0);
+#ifdef __NetBSD__
+	if (check_guid(vd)) {
+		if (error == 0) {
+			/*
+			 * check guid in the vdev label on the disk
+			 * to be robust with device name changes.
+			 * eg. recabling
+			 */
+			uint64_t guid;
+			error = disk_read_vdev_guid(vp, &guid);
+			if (error != 0) {
+				vn_close(vp, FREAD|FWRITE, kcred);
+				printf("ZFS WARNING: failed to read guid "
+				       "for %s\n", vd->vdev_path);
+			} else if (guid != vd->vdev_guid) {
+				vn_close(vp, FREAD|FWRITE, kcred);
+				printf("ZFS WARNING: vdev guid mismatch "
+				       "for %s, actual %" PRIx64
+				       " expected %" PRIx64 "\n",
+				       vd->vdev_path, guid, vd->vdev_guid);
+				error = ENOENT;
+			}
+		}
+		if (error != 0) {
+			/*
+			 * try to find the vdev by scanning all disks on
+			 * the system. this can be slow.
+			 */
+			printf("ZFS: trying to find a vdev (%s) by guid %"
+			       PRIx64 "\n", vd->vdev_path, vd->vdev_guid);
+			error = open_disk_by_vdev_guid(vd->vdev_guid, &vp);
+		}
+	}
+#endif
 	if (error != 0) {
 		vd->vdev_stat.vs_aux = VDEV_AUX_OPEN_FAILED;
 		return (SET_ERROR(error));
