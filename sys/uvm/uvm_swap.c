@@ -1,4 +1,4 @@
-/*	$NetBSD: uvm_swap.c,v 1.210 2026/01/04 00:41:14 wiz Exp $	*/
+/*	$NetBSD: uvm_swap.c,v 1.219 2026/03/23 23:51:48 yamt Exp $	*/
 
 /*
  * Copyright (c) 1995, 1996, 1997, 2009 Matthew R. Green
@@ -30,7 +30,7 @@
  */
 
 #include <sys/cdefs.h>
-__KERNEL_RCSID(0, "$NetBSD: uvm_swap.c,v 1.210 2026/01/04 00:41:14 wiz Exp $");
+__KERNEL_RCSID(0, "$NetBSD: uvm_swap.c,v 1.219 2026/03/23 23:51:48 yamt Exp $");
 
 #include "opt_uvmhist.h"
 #include "opt_compat_netbsd.h"
@@ -1376,17 +1376,7 @@ sw_reg_strategy(struct swapdev *sdp, struct buf *bp, int bn)
 				 &devvp, &nbn, &nra);
 
 		if (error == 0 && nbn == (daddr_t)-1) {
-			/*
-			 * this used to just set error, but that doesn't
-			 * do the right thing.  Instead, it causes random
-			 * memory errors.  The panic() should remain until
-			 * this condition doesn't destabilize the system.
-			 */
-#if 1
-			panic("%s: swap to sparse file", __func__);
-#else
 			error = EIO;	/* failure */
-#endif
 		}
 
 		/*
