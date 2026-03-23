@@ -57,17 +57,35 @@ struct swapent50 {
 	char	se50_path[PATH_MAX+1];	/* path name */
 };
 
+/*
+ * NetBSD 11.0 swapctl(SWAP_STATS, ...) swapent structure
+ *
+ * note: the size of padding at the end of structure varies
+ * depending on the alignment of dev_t.
+ */
+struct swapent110 {
+	dev_t	se_dev;			/* device id */
+	int	se_flags;		/* flags */
+	int	se_nblks;		/* total blocks */
+	int	se_inuse;		/* blocks in use */
+	int	se_priority;		/* priority of this device */
+	char	se_path[PATH_MAX+1];	/* path name */
+};
+
 __BEGIN_DECLS
 
 void uvm_13_init(void);
 void uvm_50_init(void);
+void uvm_110_init(void);
 void uvm_13_fini(void);
 void uvm_50_fini(void);
+void uvm_110_fini(void);
 
 struct sys_swapctl_args;
 
 extern int (*uvm_swap_stats13)(const struct sys_swapctl_args *, register_t *);
 extern int (*uvm_swap_stats50)(const struct sys_swapctl_args *, register_t *);
+extern int (*uvm_swap_stats110)(const struct sys_swapctl_args *, register_t *);
 
 __END_DECLS
 

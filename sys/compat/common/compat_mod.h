@@ -35,6 +35,8 @@
 #ifdef COMPAT_110
 int compat_110_init(void);
 int compat_110_fini(void);
+void uvm_110_init(void);
+void uvm_110_fini(void);
 #endif
 
 #ifdef COMPAT_100
