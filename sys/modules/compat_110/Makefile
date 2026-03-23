@@ -8,6 +8,6 @@ KMOD=	compat_110
 
 CPPFLAGS+=	-DCOMPAT_110
 
-SRCS+=	compat_110_mod.c
+SRCS+=	compat_110_mod.c uvm_110.c
 
 .include <bsd.kmodule.mk>

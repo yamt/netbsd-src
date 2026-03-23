@@ -42,6 +42,8 @@ __KERNEL_RCSID(0, "$NetBSD: uvm_swapstub.c,v 1.9 2024/03/15 07:09:37 andvar Exp 
 
 int (*uvm_swap_stats50)(const struct sys_swapctl_args *, register_t *) =
     (void *)enosys;
+int (*uvm_swap_stats110)(const struct sys_swapctl_args *, register_t *) =
+    (void *)enosys;
 
 void
 uvm_swap_init(void)

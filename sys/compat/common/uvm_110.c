@@ -1,11 +1,11 @@
-/*	$NetBSD: compat_110_mod.c,v 1.2 2024/05/20 01:30:34 christos Exp $ */
+/*	$NetBSD: uvm_50.c,v 1.3 2020/09/05 16:30:10 riastradh Exp $	*/
 
 /*-
- * Copyright (c) 2019 The NetBSD Foundation, Inc.
+ * Copyright (c) 2018 The NetBSD Foundation, Inc.
  * All rights reserved.
  *
- * This code is derived from software developed for The NetBSD Foundation
- * by Paul Goyette
+ * This code is derived from software contributed to The NetBSD Foundation
+ * by Christos Zoulas.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -29,51 +29,46 @@
  * POSSIBILITY OF SUCH DAMAGE.
  */
 
-/*
- * Linkage for the compat module: spaghetti.
- */
+#include <sys/cdefs.h>
+__KERNEL_RCSID(0, "$NetBSD: uvm_50.c,v 1.3 2020/09/05 16:30:10 riastradh Exp $");
 
 #if defined(_KERNEL_OPT)
 #include "opt_compat_netbsd.h"
 #endif
 
-#include <sys/cdefs.h>
-__KERNEL_RCSID(0, "$NetBSD: compat_110_mod.c,v 1.2 2024/05/20 01:30:34 christos Exp $");
+#if defined(_KERNEL) || defined(_MODULE)
+#if defined(_KERNEL_OPT)
+#include "opt_vmswap.h"
+#else
+#define VMSWAP	/* XXX */
+#endif
+#endif
 
+#include <sys/param.h>
+#include <sys/types.h>
 #include <sys/systm.h>
-#include <sys/module.h>
+#include <sys/syscallargs.h>
+#include <sys/swap.h>
 
-#include <compat/common/compat_util.h>
-#include <compat/common/compat_mod.h>
+#include <uvm/uvm_swap.h>
 
-int
-compat_110_init(void)
-{
-	uvm_110_init();
-	return 0;
-}
-
-int
-compat_110_fini(void)
-{
-	uvm_110_fini();
-	return 0;
-}
-
-MODULE(MODULE_CLASS_EXEC, compat_110, NULL);
+#include <compat/sys/uvm.h>
 
 static int
-compat_110_modcmd(modcmd_t cmd, void *arg)
+compat_uvm_swap_stats110(const struct sys_swapctl_args *uap, register_t *retval)
 {
+	return uvm_swap_stats(SCARG(uap, arg), SCARG(uap, misc),
+	     NULL, sizeof(struct swapent110), retval);
+}
 
-	switch (cmd) {
-	case MODULE_CMD_INIT:
-		return compat_110_init();
+void
+uvm_110_init(void)
+{
+	uvm_swap_stats110 = compat_uvm_swap_stats110;
+}
 
-	case MODULE_CMD_FINI:
-		return compat_110_fini();
-
-	default:
-		return ENOTTY;
-	}
+void
+uvm_110_fini(void)
+{
+	uvm_swap_stats110 = (void *)enosys;
 }
