@@ -488,7 +488,11 @@ uvm_aio_aiodone_pages(struct vm_page **pgs, int npages, bool write, int error)
 #if defined(VMSWAP)
 		KASSERT(write);
 
-		/* these pages are now only in swap. */
+		/*
+		 * these pages are now only in swap.
+		 *
+		 * note: uvm_swap_markbad() decreases swpgonly.
+		 */
 		if (error != ENOMEM) {
 			atomic_add_int(&uvmexp.swpgonly, npages);
 		}
