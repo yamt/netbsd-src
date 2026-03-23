@@ -792,11 +792,6 @@ uvmpd_scan_queue(void)
 			}
 			if (slot > 0) {
 				/* this page is now only in swap. */
-#ifdef ENABLE_UNRELIABLE_CHECK_PR_56764
-				KASSERTMSG(uvmexp.swpgonly < uvmexp.swpginuse,
-					   "swpgonly %d swpginuse %d",
-					   uvmexp.swpgonly, uvmexp.swpginuse);
-#endif
 				atomic_inc_uint(&uvmexp.swpgonly);
 			}
 			rw_exit(slock);
