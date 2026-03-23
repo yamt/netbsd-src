@@ -1503,17 +1503,7 @@ sw_reg_strategy(struct swapdev *sdp, struct buf *bp, int bn)
 				 &devvp, &nbn, &nra);
 
 		if (error == 0 && nbn == (daddr_t)-1) {
-			/*
-			 * this used to just set error, but that doesn't
-			 * do the right thing.  Instead, it causes random
-			 * memory errors.  The panic() should remain until
-			 * this condition doesn't destabilize the system.
-			 */
-#if 1
-			panic("%s: swap to sparse file", __func__);
-#else
 			error = EIO;	/* failure */
-#endif
 		}
 
 		/*
