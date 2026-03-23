@@ -289,6 +289,13 @@ swaplist_insert(struct swapdev *sdp, struct swappri *newspp, int priority)
 	KASSERT(rw_write_held(&swap_syscall_lock));
 	KASSERT(mutex_owned(&uvm_swap_data_lock));
 
+	if (LIST_EMPTY(&swap_priority)) {
+		KASSERT(uvmexp.swpginuse == 0);
+		KASSERT(uvmexp.swpgonly == 0);
+		KASSERT(uvmexp.swpages == 0);
+		KASSERT(uvmexp.swpgavail == 0);
+	}
+
 	/*
 	 * find entry at or after which to insert the new device.
 	 */
@@ -383,6 +390,13 @@ swaplist_trim(void)
 			continue;
 		LIST_REMOVE(spp, spi_swappri);
 		kmem_free(spp, sizeof(*spp));
+	}
+
+	if (LIST_EMPTY(&swap_priority)) {
+		KASSERT(uvmexp.swpginuse == 0);
+		KASSERT(uvmexp.swpgonly == 0);
+		KASSERT(uvmexp.swpages == 0);
+		KASSERT(uvmexp.swpgavail == 0);
 	}
 }
 
