@@ -234,7 +234,8 @@ device_is_eligible_for_vdev(device_t device)
 	if (device_is_a(device, "dk") ||
 	    device_is_a(device, "ld") ||
 	    device_is_a(device, "wd") ||
-	    device_is_a(device, "sd")) {
+	    device_is_a(device, "sd") ||
+	    device_is_a(device, "xbd")) {
 		return B_TRUE;
 	}
 
