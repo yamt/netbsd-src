@@ -2099,8 +2099,6 @@ config_attach_pseudo(cfdata_t cf)
 {
 	device_t dev;
 
-	KASSERT(KERNEL_LOCKED_P());
-
 	dev = config_attach_pseudo_acquire(cf, NULL);
 	if (dev == NULL)
 		return dev;
@@ -2425,7 +2423,6 @@ out:
 int
 config_detach(device_t dev, int flags)
 {
-	KASSERT(KERNEL_LOCKED_P());
 
 	device_acquire(dev);
 	return config_detach_release(dev, flags);
