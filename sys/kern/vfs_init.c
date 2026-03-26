@@ -481,7 +481,19 @@ vfs_attach(struct vfsops *vfs)
 	 * Make sure this file system doesn't already exist.
 	 */
 	LIST_FOREACH(v, &vfs_list, vfs_list) {
+		long fstype;
+
 		if (strcmp(vfs->vfs_name, v->vfs_name) == 0) {
+			error = SET_ERROR(EEXIST);
+			goto out;
+		}
+
+		fstype = makefstype(vfs->vfs_name);
+		if (fstype == makefstype(v->vfs_name)) {
+			printf("failed to attach file system '%s' "
+			       "because it shares the same fstype (%ld) "
+			       "with %s\n",
+			       vfs->vfs_name, fstype, v->vfs_name);
 			error = SET_ERROR(EEXIST);
 			goto out;
 		}
