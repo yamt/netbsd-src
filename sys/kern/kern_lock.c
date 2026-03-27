@@ -196,14 +196,31 @@ kernel_lock_spinout(void)
 	 * wait 10sec to take the lock before trying to report a
 	 * problem anyway.
 	 */
+	if (!__SIMPLELOCK_LOCKED_P(kernel_lock))
+		goto out;
+
+	/*
+	 * Note: holder == NULL here basically means
+	 * "no one has acquired kernel lock since the boot".
+	 *
+	 * Theoretically it's possbile the first locker has aquired
+	 * kernel_lock but has not updated kernel_lock_holder yet.
+	 * But it's only theoretical, I suppose.
+	 */
 	holder = atomic_load_relaxed(&kernel_lock_holder);
 	if (holder == NULL)
 		goto out;
 
 	/*
 	 * We know we don't have the kernel lock.
+	 *
+	 * However, the holder value is not reliable because we don't
+	 * hold kernel lock. For example, an interrupt on this cpu may
+	 * acquire/release the kernel lock and leave kernel_lock_holder
+	 * pointing to us.
 	 */
-	KASSERT(holder != curcpu());
+	if (holder == curcpu())
+		goto out;
 
 	/*
 	 * If we already reported kernel lock hogging in the last ten
