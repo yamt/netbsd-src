@@ -1335,6 +1335,46 @@ iobuf_redirect(struct buf *bp, struct vnode *vp)
 	bp->b_objlock = vp->v_interlock;
 }
 
+struct sw_physio_decrypt_context {
+	size_t bounce_offset;
+	void *orig_buf;
+	size_t orig_size;
+	void *orig_private;
+	void (*orig_iodone)(struct buf *);
+	int swslot;
+};
+
+static void
+sw_physio_decrypt_iodone(struct buf *bp)
+{
+	struct sw_physio_decrypt_context *ctx = bp->b_private;
+	void (*cb)(struct buf *bp) = ctx->orig_iodone;
+	size_t npages = bp->b_bcount >> PAGE_SHIFT;
+
+	KASSERT(ctx->swslot > 0);
+	KASSERT(npages << PAGE_SHIFT == bp->b_bcount);
+	if (bp->b_error == 0) {
+		if (bp->b_resid == 0) {
+			uvm_swap_decrypt_pages(ctx->swslot, bp->b_data,
+					       npages);
+			memcpy(ctx->orig_buf,
+			       (uint8_t *)bp->b_data + ctx->bounce_offset,
+			       ctx->orig_size);
+		} else {
+			bp->b_error = EIO;
+		}
+	}
+	kmem_intr_free(bp->b_data, bp->b_bcount);
+	bp->b_data = ctx->orig_buf;
+	bp->b_bcount = ctx->orig_size;
+	if (bp->b_error != 0) {
+		bp->b_resid = bp->b_bcount;
+	}
+	bp->b_private = ctx->orig_private;
+	kmem_intr_free(ctx, sizeof(*ctx));
+	(cb)(bp); /* call the original b_iodone callback */
+}
+
 /*
  * swstrategy: perform I/O on the drum
  *
@@ -1363,6 +1403,54 @@ swstrategy(struct buf *bp)
 		biodone(bp);
 		UVMHIST_LOG(pdhist, "  failed to get swap device", 0, 0, 0, 0);
 		return;
+	}
+
+	/*
+	 * B_RAW here implies user i/o on /dev/drum, for which we need
+	 * to handle encryption/decryption here.
+	 * for swap in/out, it's handled by the caller.
+	 */
+	if ((bp->b_flags & B_RAW) != 0 &&
+	    atomic_load_relaxed(&uvm_swap_encrypt)) {
+		struct sw_physio_decrypt_context *ctx;
+		size_t bounce_size;
+
+		/*
+		 * we only implement B_READ for now.
+		 *
+		 * REVISIT: what kind of apps needs to write to /dev/drum?
+		 */
+		if ((bp->b_flags & B_READ) == 0) {
+			bp->b_error = ENOTSUP;
+			bp->b_resid = bp->b_bcount;
+			biodone(bp);
+			return;
+		}
+
+		/*
+		 * in-place decryption in the userland buffer might
+		 * have non-trivial implications. also, our code is
+		 * optimized for page-aligned i/o. for simplicity,
+		 * use a page-size-exteneded bounce buffer.
+		 */
+		ctx = kmem_intr_alloc(sizeof(*ctx), KM_SLEEP);
+		ctx->bounce_offset = dbtob(bp->b_blkno) & PAGE_MASK;
+		ctx->swslot = dbtob(bp->b_blkno) >> PAGE_SHIFT;
+		KASSERT(ctx->swslot > 0);
+		bounce_size = roundup2(ctx->bounce_offset + bp->b_bcount,
+				       PAGE_SIZE);
+		ctx->orig_buf = bp->b_data;
+		ctx->orig_size = bp->b_bcount;
+		ctx->orig_private = bp->b_private;
+		ctx->orig_iodone = bp->b_iodone;
+		bp->b_data = kmem_intr_alloc(bounce_size, KM_SLEEP);
+		bp->b_bcount = bounce_size;
+		bp->b_blkno -= btodb(ctx->bounce_offset);
+		KASSERT((dbtob(bp->b_blkno) & PAGE_MASK) == 0);
+		KASSERT((dbtob(bp->b_blkno) >> PAGE_SHIFT) == ctx->swslot);
+		KASSERT((bp->b_bcount & PAGE_MASK) == 0);
+		bp->b_private = ctx;
+		bp->b_iodone = sw_physio_decrypt_iodone;
 	}
 
 	/*
@@ -1937,10 +2025,14 @@ uvm_swap_decrypt_pages(int startslot, void *p, int npages)
 	mutex_exit(&uvm_swap_data_lock);
 
 	/*
-	 * !encinit here means we are swapping in a page which
-	 * has neven been swapped out. it should be a bug.
+	 * !encinit here means we are reading a swap device which has never
+	 * been written by the swap out process. this should be a user read
+	 * on /dev/drum.
 	 */
-	KASSERT(encinit);
+	if (!encinit) {
+		memset(p, 0, npages * PAGE_SIZE);
+		return;
+	}
 	for (i = 0; i < npages; i++) {
 		int s = startslot + i;
 		KDASSERT(swapdrum_sdp_is(s, sdp));
