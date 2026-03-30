@@ -1125,7 +1125,8 @@ swap_on(struct lwp *l, struct swapdev *sdp)
 		if (sw_reg_count++ == 0) {
 			KASSERT(sw_reg_workqueue == NULL);
 			if (workqueue_create(&sw_reg_workqueue, "swapiod",
-			    sw_reg_iodone, NULL, PRIBIO, IPL_SOFTBIO, 0) != 0)
+			    sw_reg_iodone, NULL, PRIBIO, IPL_SOFTBIO,
+			    WQ_MPSAFE) != 0)
 				panic("%s: workqueue_create failed", __func__);
 		}
 	}
