@@ -41,6 +41,7 @@ __KERNEL_RCSID(0, "$NetBSD: nvmm_x86.c,v 1.24 2026/02/08 10:59:52 nia Exp $");
 #include <x86/cputypes.h>
 #include <x86/pat.h>
 #include <x86/specialreg.h>
+#include <x86/nmi.h>
 
 #include <dev/nvmm/nvmm.h>
 #include <dev/nvmm/nvmm_internal.h>
@@ -465,4 +466,24 @@ nvmm_x86_pat_validate(uint64_t val)
 	}
 
 	return true;
+}
+
+void
+nvmm_x86_nmi_dispatch(void)
+{
+	struct trapframe fake;
+
+	/*
+	 * this fake frame is ok for tprof.
+	 */
+	memset(&fake, 0, sizeof(fake));
+#if defined(__x86_64__)
+	fake.tf_rip = (uintptr_t)nvmm_x86_nmi_dispatch;
+#else
+	fake.tf_eip = (uintptr_t)nvmm_x86_nmi_dispatch;
+#endif
+	if (!nmi_dispatch(&fake)) {
+		/* XXX what to do for kgdb/ddb? */
+		x86_nmi();
+	}
 }

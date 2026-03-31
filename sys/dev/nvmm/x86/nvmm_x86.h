@@ -323,6 +323,7 @@ extern const struct nvmm_x86_cpuid_mask nvmm_cpuid_80000001;
 extern const struct nvmm_x86_cpuid_mask nvmm_cpuid_80000007;
 extern const struct nvmm_x86_cpuid_mask nvmm_cpuid_80000008;
 bool nvmm_x86_pat_validate(uint64_t);
+void nvmm_x86_nmi_dispatch(void);
 #endif
 
 #endif /* ASM_NVMM */
