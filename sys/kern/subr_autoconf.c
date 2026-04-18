@@ -223,7 +223,7 @@ static struct deferred_config_head deferred_config_queue =
 	TAILQ_HEAD_INITIALIZER(deferred_config_queue);
 static struct deferred_config_head interrupt_config_queue =
 	TAILQ_HEAD_INITIALIZER(interrupt_config_queue);
-static int interrupt_config_threads = 8;
+static int interrupt_config_threads = 1;
 static struct deferred_config_head mountroot_config_queue =
 	TAILQ_HEAD_INITIALIZER(mountroot_config_queue);
 static int mountroot_config_threads = 2;
