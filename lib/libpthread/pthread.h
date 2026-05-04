@@ -322,9 +322,9 @@ __END_DECLS
  * applications which don't link against libpthread at all.
  *
  * The rename is done as:
- * #define pthread_foo	__libc_thr_foo
+ * #define pthread_foo	__libc_foo
  * instead of
- * #define pthread_foo(x) __libc_thr_foo((x))
+ * #define pthread_foo(x) __libc_foo((x))
  * in order that taking the address of the function ("func =
  * &pthread_foo;") continue to work.
  *
