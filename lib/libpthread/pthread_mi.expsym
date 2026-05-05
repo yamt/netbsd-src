@@ -122,14 +122,11 @@ openat
 poll
 pread
 pthread__allqueue
-pthread__alltree_lock
 pthread__cancel_stub_binder
 pthread__cleanup_pop
 pthread__cleanup_push
 pthread__concurrency
 pthread__dbg
-pthread__deadqueue
-pthread__deadqueue_lock
 pthread__errno
 pthread__guardsize
 pthread__init
@@ -138,7 +135,6 @@ pthread__nspins
 pthread__pagesize
 pthread__sched_yield
 pthread__stacksize
-pthread__started
 pthread__static_lib_binder
 pthread__tsd_destructors
 pthread__tsd_list

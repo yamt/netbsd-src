@@ -83,7 +83,7 @@ __BEGIN_DECLS
 void _malloc_thread_cleanup(void) __weak;
 __END_DECLS
 
-pthread_rwlock_t pthread__alltree_lock = PTHREAD_RWLOCK_INITIALIZER;
+static pthread_rwlock_t pthread__alltree_lock = PTHREAD_RWLOCK_INITIALIZER;
 static rb_tree_t	pthread__alltree;
 
 static signed int	pthread__cmp(void *, const void *, const void *);
@@ -103,10 +103,10 @@ static void	pthread__reap(pthread_t);
 
 void	pthread__init(void);
 
-int pthread__started;
+static int pthread__started;
 int __uselibcstub = 1;
-pthread_mutex_t pthread__deadqueue_lock = PTHREAD_MUTEX_INITIALIZER;
-pthread_queue_t pthread__deadqueue;
+static pthread_mutex_t pthread__deadqueue_lock = PTHREAD_MUTEX_INITIALIZER;
+static pthread_queue_t pthread__deadqueue;
 pthread_queue_t pthread__allqueue; /* only for ancient libpthread_dbg */
 
 static pthread_attr_t pthread_default_attr;
