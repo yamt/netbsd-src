@@ -1,11 +1,12 @@
+#	$NetBSD$
+
 PROG=	daemon
 MAN=	daemon.8
 
-LIBADD=	util
+LDADD+= -lutil
+DPADD+= ${LIBUTIL}
 
-.include <src.opts.mk>
-
-HAS_TESTS=
-SUBDIR.${MK_TESTS}+= tests
+#HAS_TESTS=
+#SUBDIR.${MK_TESTS}+= tests
 
 .include <bsd.prog.mk>

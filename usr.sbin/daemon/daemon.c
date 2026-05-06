@@ -30,6 +30,8 @@
  *	From BSDI: daemon.c,v 1.2 1996/08/15 01:11:09 jch Exp
  */
 
+#define _OPENBSD_SOURCE /* strtonum */
+
 #include <sys/event.h>
 #include <sys/mman.h>
 #include <sys/wait.h>
@@ -38,7 +40,11 @@
 #include <err.h>
 #include <errno.h>
 #include <getopt.h>
+#if defined(__NetBSD__)
+#include <util.h>
+#else
 #include <libutil.h>
+#endif
 #include <login_cap.h>
 #include <paths.h>
 #include <pwd.h>
@@ -73,14 +79,18 @@ struct daemon_state {
 	unsigned char buf[LBUF_SIZE];
 	size_t pos;
 	char **argv;
+#if !defined(__NetBSD__)
 	const char *child_pidfile;
+#endif
 	const char *parent_pidfile;
 	const char *output_filename;
 	const char *syslog_tag;
 	const char *title;
 	const char *user;
+#if !defined(__NetBSD__)
 	struct pidfh *parent_pidfh;
 	struct pidfh *child_pidfh;
+#endif
 	enum daemon_mode mode;
 	int pid;
 	int pipe_rd;
@@ -117,9 +127,18 @@ static bool daemon_is_child_dead(struct daemon_state *);
 static void daemon_set_child_pipe(struct daemon_state *);
 static int daemon_setup_kqueue(void);
 
+#if !defined(__NetBSD__)
 static int pidfile_truncate(struct pidfh *);
+#endif
 
+#if defined(__NetBSD__)
+/*
+ * -p is not implemented for NetBSD.
+ */
+static const char shortopts[] = "+cfHSP:ru:o:M:s:l:t:m:R:T:C:h";
+#else
 static const char shortopts[] = "+cfHSp:P:ru:o:M:s:l:t:m:R:T:C:h";
+#endif
 
 static const struct option longopts[] = {
 	{ "change-dir",         no_argument,            NULL,           'c' },
@@ -129,7 +148,9 @@ static const struct option longopts[] = {
 	{ "output-file",        required_argument,      NULL,           'o' },
 	{ "output-file-mode",   required_argument,      NULL,           'M' },
 	{ "output-mask",        required_argument,      NULL,           'm' },
+#if defined(__NetBSD__)
 	{ "child-pidfile",      required_argument,      NULL,           'p' },
+#endif
 	{ "supervisor-pidfile", required_argument,      NULL,           'P' },
 	{ "restart",            no_argument,            NULL,           'r' },
 	{ "restart-count",      required_argument,      NULL,           'C' },
@@ -262,10 +283,12 @@ main(int argc, char *argv[])
 			free(set);
 			set = NULL;
 			break;
+#if !defined(__NetBSD__)
 		case 'p':
 			state.child_pidfile = optarg;
 			state.mode = MODE_SUPERVISE;
 			break;
+#endif
 		case 'P':
 			state.parent_pidfile = optarg;
 			state.mode = MODE_SUPERVISE;
@@ -353,12 +376,18 @@ main(int argc, char *argv[])
 		daemon_terminate(&state);
 	}
 
+#if defined(__NetBSD__)
+	open_pid_files(&state);
+#endif
+
 	if (state.mode == MODE_DAEMON) {
 		daemon_exec(&state);
 	}
 
+#if !defined(__NetBSD__)
 	/* Write out parent pidfile if needed. */
 	pidfile_write(state.parent_pidfh);
+#endif
 
 	state.kqueue_fd = daemon_setup_kqueue();
 
@@ -380,7 +409,9 @@ main(int argc, char *argv[])
 static void
 daemon_exec(struct daemon_state *state)
 {
+#if !defined(__NetBSD__)
 	pidfile_write(state->child_pidfh);
+#endif
 
 	if (state->user != NULL) {
 		restrict_process(state->user);
@@ -413,12 +444,14 @@ daemon_eventloop(struct daemon_state *state)
 	int ret;
 	int pipe_fd[2];
 
+#if defined(MADV_PROTECT)
 	/*
 	 * Try to protect against pageout kill. Ignore the
 	 * error, madvise(2) will fail only if a process does
 	 * not have superuser privileges.
 	 */
 	(void)madvise(NULL, 0, MADV_PROTECT);
+#endif
 
 	if (pipe(pipe_fd)) {
 		err(1, "pipe");
@@ -534,6 +567,7 @@ daemon_eventloop(struct daemon_state *state)
 	close(state->pipe_rd);
 	state->pipe_rd = -1;
 
+#if !defined(__NetBSD__)
 	/*
 	 * We don't have to truncate the pidfile, but it's easier to test
 	 * daemon(8) behavior in some respects if we do.  We won't bother if
@@ -542,6 +576,7 @@ daemon_eventloop(struct daemon_state *state)
 	if (state->child_pidfh != NULL && state->restart_enabled) {
 		pidfile_truncate(state->child_pidfh);
 	}
+#endif
 }
 
 /*
@@ -620,6 +655,7 @@ static void
 open_pid_files(struct daemon_state *state)
 {
 	pid_t fpid;
+#if !defined(__NetBSD__)
 	int serrno;
 
 	if (state->child_pidfile) {
@@ -632,8 +668,19 @@ open_pid_files(struct daemon_state *state)
 			err(2, "pidfile ``%s''", state->child_pidfile);
 		}
 	}
+#endif
 	/* Do the same for the actual daemon process. */
 	if (state->parent_pidfile) {
+#if defined(__NetBSD__)
+		fpid = pidfile_lock(state->parent_pidfile);
+		if (fpid != 0) {
+			if (fpid > 0 && errno == EEXIST) {
+				errx(3, "process already running, pid: %d",
+				     fpid);
+			}
+			err(2, "ppidfile ``%s''", state->parent_pidfile);
+		}
+#else
 		state->parent_pidfh= pidfile_open(state->parent_pidfile, 0600, &fpid);
 		if (state->parent_pidfh == NULL) {
 			serrno = errno;
@@ -645,6 +692,7 @@ open_pid_files(struct daemon_state *state)
 			}
 			err(2, "ppidfile ``%s''", state->parent_pidfile);
 		}
+#endif
 	}
 }
 
@@ -795,9 +843,11 @@ daemon_state_init(struct daemon_state *state)
 		.buf = {0},
 		.pos = 0,
 		.argv = NULL,
+#if !defined(__NetBSD__)
 		.parent_pidfh = NULL,
 		.child_pidfh = NULL,
 		.child_pidfile = NULL,
+#endif
 		.parent_pidfile = NULL,
 		.title = NULL,
 		.user = NULL,
@@ -845,8 +895,12 @@ daemon_terminate(struct daemon_state *state)
 	if (state->syslog_enabled) {
 		closelog();
 	}
+#if defined(__NetBSD__)
+	/* the pidfile is cleaned up by atexit */
+#else
 	pidfile_remove(state->child_pidfh);
 	pidfile_remove(state->parent_pidfh);
+#endif
 
 	/*
 	 * Note that the exit value here doesn't matter in the case of a clean
@@ -908,7 +962,11 @@ daemon_setup_kqueue(void)
 	int kq;
 	struct kevent event = { 0 };
 
+#if defined(KQUEUE_CLOEXEC)
 	kq = kqueuex(KQUEUE_CLOEXEC);
+#else
+	kq = kqueue1(O_CLOEXEC);
+#endif
 	if (kq == -1) {
 		err(EXIT_FAILURE, "kqueue");
 	}
@@ -931,6 +989,7 @@ daemon_setup_kqueue(void)
 	return (kq);
 }
 
+#if !defined(__NetBSD__)
 static int
 pidfile_truncate(struct pidfh *pfh)
 {
@@ -949,3 +1008,4 @@ pidfile_truncate(struct pidfh *pfh)
 	(void)lseek(pfd, 0, SEEK_SET);
 	return (0);
 }
+#endif
